@@ -19,7 +19,7 @@ const legacyThemeMap: Record<string, { season: SeasonName; palette: PaletteName 
   snow: { season: 'winter', palette: 'blue' },
 };
 
-const HINT_STORAGE_KEY = 'qr-worlds:v3-interacted';
+const HINT_STORAGE_KEY = 'qr-worlds:v4-interacted';
 
 function isSeason(value: string | null): value is SeasonName {
   return value === 'spring' || value === 'summer' || value === 'autumn' || value === 'winter';
@@ -43,9 +43,7 @@ function readInitialState() {
   const rawSeason = params.get('season');
   const rawPalette = params.get('palette');
   const season = isSeason(rawSeason) ? rawSeason : legacy?.season || 'spring';
-  const palette = isPalette(rawPalette)
-    ? rawPalette
-    : legacy?.palette || 'pink';
+  const palette = isPalette(rawPalette) ? rawPalette : legacy?.palette || 'pink';
   const parsedSeed = Number.parseInt(params.get('seed') || '', 10);
   const worldSeed = Number.isFinite(parsedSeed) ? parsedSeed >>> 0 : hashString(data + ':world');
   return { data, season, palette, worldSeed };
@@ -76,7 +74,7 @@ export default function App() {
     } catch {
       // The hint can still appear when storage is unavailable.
     }
-    const timer = window.setTimeout(() => setShowTapHint(true), 2000);
+    const timer = window.setTimeout(() => setShowTapHint(true), 1800);
     return () => window.clearTimeout(timer);
   }, [hintAcknowledged]);
 
@@ -90,6 +88,7 @@ export default function App() {
       // Interaction remains fully functional without persistent storage.
     }
   };
+
   const handleCanvasKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
@@ -117,17 +116,7 @@ export default function App() {
   return (
     <main className="app-shell" style={{ '--accent': theme.accent } as CSSProperties}>
       <header className="topbar">
-        <a className="brand" href="./" aria-label="QR Worlds home">
-          <span className="brand-mark" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-            <i />
-          </span>
-          <span>QR Worlds</span>
-          <span className="version-tag">V3</span>
-        </a>
-        <div className="topbar-copy">Every link hides a little world.</div>
+        <a className="brand" href="./" aria-label="QR Worlds home">QR WORLDS</a>
         <a
           className="github-link"
           href="https://github.com/lavine888/QR-Worlds"
@@ -138,21 +127,14 @@ export default function App() {
         </a>
       </header>
 
-      <section className="hero">
-        <div className="hero-copy">
-          <p>Every link hides a little world.</p>
-          <h1>
-            Turn any link into a living,{' '}
-            <span>scannable world.</span>
-          </h1>
-        </div>
+      <section className="demo-shell">
         <div
           className="canvas-card"
           onClick={toggleMode}
           onKeyDown={handleCanvasKeyDown}
           role="button"
           tabIndex={0}
-          aria-label={scanMode ? 'Bloom back into a living tree' : 'Reveal the hidden QR code'}
+          aria-label={scanMode ? 'Return to world view' : 'Reveal the QR code'}
         >
           <WorldCanvas
             matrix={matrix}
@@ -162,12 +144,7 @@ export default function App() {
             scanMode={scanMode}
             onCanvasReady={onCanvasReady}
           />
-          {showTapHint ? (
-            <div className="tap-hint" aria-hidden="true">
-              <span />
-              Tap the world
-            </div>
-          ) : null}
+          {showTapHint ? <div className="tap-hint">Tap the world</div> : null}
         </div>
 
         {error ? <div className="error-banner">{error}</div> : null}
@@ -191,11 +168,6 @@ export default function App() {
           onRandomize={() => setWorldSeed(randomSeed())}
         />
       </section>
-
-      <footer className="footer">
-        <span>Private by design · generated entirely in your browser.</span>
-        <span>Open source on GitHub.</span>
-      </footer>
     </main>
   );
 }
