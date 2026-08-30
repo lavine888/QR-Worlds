@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useState, type CSSProperties, type KeyboardEvent } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type PointerEvent,
+} from 'react';
 import { ControlDock } from './components/ControlDock';
 import { useQR } from './hooks/useQR';
 import { useSceneCanvas } from './hooks/useScene';
@@ -20,6 +28,7 @@ const legacyThemeMap: Record<string, { season: SeasonName; palette: PaletteName 
 };
 
 const HINT_STORAGE_KEY = 'qr-worlds:v4-interacted';
+const LONG_PRESS_MS = 620;
 
 function isSeason(value: string | null): value is SeasonName {
   return value === 'spring' || value === 'summer' || value === 'autumn' || value === 'winter';
@@ -60,6 +69,9 @@ export default function App() {
   const [shareError, setShareError] = useState('');
   const [showTapHint, setShowTapHint] = useState(false);
   const [hintAcknowledged, setHintAcknowledged] = useState(false);
+  const [surpriseTick, setSurpriseTick] = useState(0);
+  const longPressTimer = useRef<number | null>(null);
+  const suppressNextClick = useRef(false);
   const { canvasRef, canvasReady, onCanvasReady } = useSceneCanvas();
   const { debouncedValue, matrix, error, verification } = useQR(value);
   const theme = getWorldTheme(season, palette);
@@ -78,8 +90,14 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [hintAcknowledged]);
 
-  const toggleMode = () => {
-    setScanMode((current) => !current);
+  useEffect(
+    () => () => {
+      if (longPressTimer.current !== null) window.clearTimeout(longPressTimer.current);
+    },
+    [],
+  );
+
+  const markInteracted = () => {
     setShowTapHint(false);
     setHintAcknowledged(true);
     try {
@@ -87,6 +105,37 @@ export default function App() {
     } catch {
       // Interaction remains fully functional without persistent storage.
     }
+  };
+
+  const toggleMode = () => {
+    setScanMode((current) => !current);
+    markInteracted();
+  };
+
+  const handleCanvasClick = () => {
+    if (suppressNextClick.current) {
+      suppressNextClick.current = false;
+      return;
+    }
+    toggleMode();
+  };
+
+  const clearLongPress = () => {
+    if (longPressTimer.current !== null) {
+      window.clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
+  const handlePointerDown = (event: PointerEvent<HTMLElement>) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    clearLongPress();
+    longPressTimer.current = window.setTimeout(() => {
+      suppressNextClick.current = true;
+      setSurpriseTick((current) => current + 1);
+      markInteracted();
+      longPressTimer.current = null;
+    }, LONG_PRESS_MS);
   };
 
   const handleCanvasKeyDown = (event: KeyboardEvent<HTMLElement>) => {
@@ -130,7 +179,11 @@ export default function App() {
       <section className="demo-shell">
         <div
           className="canvas-card"
-          onClick={toggleMode}
+          onClick={handleCanvasClick}
+          onPointerDown={handlePointerDown}
+          onPointerUp={clearLongPress}
+          onPointerCancel={clearLongPress}
+          onPointerLeave={clearLongPress}
           onKeyDown={handleCanvasKeyDown}
           role="button"
           tabIndex={0}
@@ -142,6 +195,7 @@ export default function App() {
             seedText={matrix.content}
             worldSeed={worldSeed}
             scanMode={scanMode}
+            surpriseTick={surpriseTick}
             onCanvasReady={onCanvasReady}
           />
           {showTapHint ? <div className="tap-hint">Tap the world</div> : null}
