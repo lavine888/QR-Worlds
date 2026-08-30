@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import type { QRMatrix } from '../qr/generateQR';
 import { CameraRig } from './CameraRig';
 import type { WorldTheme } from './themes';
+import { VoxelBee } from './VoxelBee';
 import { VoxelWorld } from './VoxelWorld';
 
 type WorldCanvasProps = {
@@ -12,6 +13,7 @@ type WorldCanvasProps = {
   seedText: string;
   worldSeed: number;
   scanMode: boolean;
+  surpriseTick?: number;
   onCanvasReady?: (canvas: HTMLCanvasElement) => void;
 };
 
@@ -21,6 +23,7 @@ export function WorldCanvas({
   seedText,
   worldSeed,
   scanMode,
+  surpriseTick = 0,
   onCanvasReady,
 }: WorldCanvasProps) {
   const progress = useRef(scanMode ? 1 : 0);
@@ -72,6 +75,7 @@ export function WorldCanvas({
           theme={theme}
           progress={progress}
         />
+        <VoxelBee trigger={surpriseTick} worldSize={matrix.size} />
       </Suspense>
 
       <CameraRig target={scanMode ? 1 : 0} progress={progress} matrixSize={matrix.size} />
