@@ -1,5 +1,5 @@
 import { useFrame, useThree } from '@react-three/fiber';
-import { useEffect, type MutableRefObject } from 'react';
+import { useEffect, useState, type MutableRefObject } from 'react';
 import * as THREE from 'three';
 
 type CameraRigProps = {
@@ -14,6 +14,7 @@ const position = new THREE.Vector3();
 
 export function CameraRig({ target, progress, worldSize }: CameraRigProps) {
   const { camera, size } = useThree();
+  const [reducedMotion, setReducedMotion] = useState(false);
 
   useEffect(() => {
     camera.near = 0.1;
@@ -21,8 +22,16 @@ export function CameraRig({ target, progress, worldSize }: CameraRigProps) {
     camera.updateProjectionMatrix();
   }, [camera]);
 
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => setReducedMotion(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+
   useFrame((_, delta) => {
-    const speed = 4.6;
+    const speed = reducedMotion ? 48 : 4.6;
     progress.current += (target - progress.current) * (1 - Math.exp(-speed * delta));
     if (Math.abs(target - progress.current) < 0.0005) progress.current = target;
 

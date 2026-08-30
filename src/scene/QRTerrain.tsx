@@ -44,9 +44,9 @@ export function QRTerrain({ matrix, theme, progress }: QRTerrainProps) {
     lastProgress.current = p;
     lastTheme.current = theme.name;
 
-    const tileSize = THREE.MathUtils.lerp(0.88, 1.005, p);
-    const darkHeight = THREE.MathUtils.lerp(0.22, 0.035, p);
-    const lightHeight = THREE.MathUtils.lerp(0.075, 0.03, p);
+    const tileSize = THREE.MathUtils.lerp(0.76, 1.005, p);
+    const darkHeight = THREE.MathUtils.lerp(0.32, 0.035, p);
+    const lightHeight = THREE.MathUtils.lerp(0.12, 0.03, p);
 
     const updateInstances = (mesh: THREE.InstancedMesh | null, cells: Cell[], height: number) => {
       if (!mesh) return;
@@ -67,8 +67,10 @@ export function QRTerrain({ matrix, theme, progress }: QRTerrainProps) {
     const lightMaterial = lightRef.current?.material as THREE.MeshBasicMaterial | undefined;
     const boardMaterial = boardRef.current?.material as THREE.MeshStandardMaterial | undefined;
 
-    darkMaterial?.color.copy(new THREE.Color(theme.darkTile).lerp(scanDark, p));
-    lightMaterial?.color.copy(new THREE.Color(theme.lightTile).lerp(scanLight, p));
+    const gardenDark = new THREE.Color(theme.ground).lerp(new THREE.Color(theme.leaf), 0.035);
+    const gardenLight = new THREE.Color(theme.ground).lerp(new THREE.Color(theme.lightTile), 0.08);
+    darkMaterial?.color.copy(gardenDark.lerp(scanDark, p));
+    lightMaterial?.color.copy(gardenLight.lerp(scanLight, p));
     boardMaterial?.color.copy(new THREE.Color(theme.ground).lerp(scanLight, p));
   });
 

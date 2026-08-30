@@ -6,3 +6,12 @@ export function hashString(value: string) {
   }
   return hash >>> 0;
 }
+
+export function randomSeed() {
+  if (typeof crypto !== 'undefined' && 'getRandomValues' in crypto) {
+    const values = new Uint32Array(1);
+    crypto.getRandomValues(values);
+    return values[0];
+  }
+  return Math.floor(Math.random() * 0xffffffff) >>> 0;
+}

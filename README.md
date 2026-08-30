@@ -1,97 +1,129 @@
 # QR Worlds
 
-> Turn any QR code into a tiny world.
+> Turn any QR code into a tiny, living garden.
 
-QR Worlds is a client-side generative art experiment that transforms a real QR matrix into a miniature 3D diorama. The same QR modules form the terrain; tap the scene and the camera smoothly moves from an isometric world into a flat, high-contrast scan view.
+QR Worlds is a client-only generative art experiment. It turns a real,
+error-corrected QR matrix into a small 3D diorama, then morphs that same
+surface into a clean scan view. Type a URL or text, choose a season and
+palette, and tap the scene to move between the garden and the QR.
 
-## V1
+## Included
 
-- Paste any URL or short text and generate a real QR code with **error correction H**.
-- 4-module quiet zone is preserved around the QR matrix.
-- QR modules become instanced 3D tiles.
-- Deterministic procedural tree: the same input always grows the same tree.
-- Smooth **World ↔ Scan** transition driven by one shared progress value.
-- Four visual worlds: Sakura, Forest, Autumn, Snow.
-- Download a clean, scanner-friendly SVG QR.
-- Shareable URL state (`?data=...&theme=...`).
-- Everything runs locally in the browser; input is not sent to a server.
-- Responsive desktop/mobile layout.
+- Real QR generation in byte mode with error correction level H.
+- An explicit four-module quiet zone, with automatic recovery up to eight
+  modules when hidden validation needs more room.
+- Hidden-canvas validation through @zxing/browser; the interface reports
+  verified, recovering, or unavailable instead of silently claiming success.
+- One shared transition progress for the orthographic camera, tile height and
+  spacing, contrast, QR-rooted square bloom, grass, wind, and seasonal
+  particles.
+- Deterministic growth rooted in the QR's dark modules. Each selected dark
+  module becomes a square flower tile that rises into a central bloom canopy;
+  selected roots also grow restrained stems and foliage. A shareable world
+  seed controls the variation.
+- Spring, Summer, Autumn, and Winter controls.
+- Pink, Green, Gold, Blue, White, and Lavender palettes.
+- Instanced QR modules, square bloom tiles, branches, leaves, blossoms, grass,
+  and flowers, plus a bounded point-particle layer.
+- A crisp 1024 x 1024 QR PNG, SVG export, and a Garden PNG from the WebGL
+  drawing buffer.
+- Share links containing data, season, palette, and seed.
+- Responsive controls, keyboard-accessible scene toggling, and a WebGL path
+  that does not require WebGPU.
+
+The QR PNG and the scan endpoint are intentionally plain black-and-white. The
+decorative garden is allowed to be expressive; the export remains scanner
+friendly.
 
 ## Stack
 
-- React + TypeScript + Vite
+- React 19 + TypeScript + Vite
 - Three.js + React Three Fiber
-- `qrcode-generator`
-- Instanced meshes for QR modules, leaves, blossoms, and ground details
+- qrcode-generator
+- @zxing/browser
 
 ## Run locally
 
-```bash
+~~~bash
 npm install
 npm run dev
-```
+~~~
 
 Production build:
 
-```bash
+~~~bash
 npm run build
 npm run preview
-```
+~~~
 
-## Architecture
-
-```text
-src/
-├── components/
-│   ├── ControlDock.tsx
-│   └── ThemePicker.tsx
-├── procedural/
-│   ├── hash.ts
-│   └── random.ts
-├── qr/
-│   ├── downloadQR.ts
-│   └── generateQR.ts
-├── scene/
-│   ├── CameraRig.tsx
-│   ├── GroundDetails.tsx
-│   ├── ProceduralTree.tsx
-│   ├── QRTerrain.tsx
-│   ├── WorldCanvas.tsx
-│   └── themes.ts
-├── App.tsx
-├── main.tsx
-└── styles.css
-```
-
-### One progress value, one transformation
-
-V1 intentionally avoids switching between an unrelated 3D scene and a separate QR UI. A shared transition progress controls camera position, camera up-vector, zoom, tile height, tile spacing, tile contrast, tree scale, and decorative ground details. This keeps the reveal feeling like one physical object changing state.
-
-### Deterministic world generation
-
-The input text is hashed into a seed. A seeded pseudo-random generator uses that seed to place branches, leaves, blossoms, and surrounding plants, so a shared link recreates the same tiny world.
+The Vite output directory is dist/.
 
 ## Deploy
 
-The project is static and works on Vercel, Cloudflare Pages, Netlify, and GitHub Pages.
+QR Worlds is a static site and can be deployed to Vercel, Cloudflare Pages,
+Netlify, or GitHub Pages.
 
-- Build command: `npm run build`
-- Output directory: `dist`
+- Build command: npm run build
+- Output directory: dist
+- Required environment variables: none
 
-## V1 scope / next steps
+The Vercel project dashboard supplied for the current deployment is
+[lavine/qr-worlds](https://vercel.com/lavine/qr-worlds). The public deployment
+hostname is environment-specific, so this repository does not hard-code an
+unverified URL.
 
-Planned directions for V2:
+## Architecture
 
-- Automatic in-browser QR decode verification
-- PNG export for the 3D world
-- Shader-driven wind and seasonal particles
-- More world archetypes (island, castle, cyber city, mushroom, Minecraft-inspired voxel world)
-- Better long-text capacity feedback
-- Accessibility and reduced-motion scan transition
+~~~text
+src/
+├── components/
+│   ├── ControlDock.tsx
+│   ├── Controls.tsx
+│   ├── PalettePicker.tsx
+│   ├── QRInput.tsx
+│   └── SeasonPicker.tsx
+├── hooks/
+│   ├── useQR.ts
+│   └── useScene.ts
+├── procedural/
+│   ├── hash.ts
+│   ├── random.ts
+│   └── worldGenerator.ts
+├── qr/
+│   ├── downloadQR.ts
+│   ├── generateQR.ts
+│   ├── matrix.ts
+│   └── validateQR.ts
+├── scene/
+│   ├── CameraRig.tsx
+│   ├── GroundDetails.tsx
+│   ├── Particles.tsx
+│   ├── ProceduralBloom.tsx
+│   ├── QRTerrain.tsx
+│   ├── WorldCanvas.tsx
+│   ├── themes.ts
+│   └── wind.ts
+├── App.tsx
+├── main.tsx
+└── styles.css
+~~~
 
-## Credits
+ARCHITECTURE.md defines the data flow, renderer policy, transition contract,
+determinism boundary, and deployment assumptions. REFERENCE_ANALYSIS.md
+records the public creative-coding reference that informed the interaction
+model and the independent implementation boundary.
 
-The broader idea of transforming a QR code into a living generative scene has appeared in multiple creative coding experiments. QR Worlds' code and web implementation are independently written for this repository.
+## Privacy and limitations
+
+All content stays in the browser. QR generation, validation, scene generation,
+sharing, and export do not call an application server. A very long payload can
+exceed the H-level QR capacity; in that case the last usable QR remains visible
+and the input receives an actionable error.
+
+Physical-camera scan quality still depends on the device, display brightness,
+focus, and viewing distance. The hidden decoder verifies the plain QR export;
+it cannot replace acceptance testing with the camera hardware that will be
+used in production.
 
 ## License
 

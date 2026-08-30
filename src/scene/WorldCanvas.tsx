@@ -3,7 +3,8 @@ import { Suspense, useRef } from 'react';
 import type { QRMatrix } from '../qr/generateQR';
 import { CameraRig } from './CameraRig';
 import { GroundDetails } from './GroundDetails';
-import { ProceduralTree } from './ProceduralTree';
+import { Particles } from './Particles';
+import { ProceduralBloom } from './ProceduralBloom';
 import { QRTerrain } from './QRTerrain';
 import type { WorldTheme } from './themes';
 
@@ -11,10 +12,19 @@ type WorldCanvasProps = {
   matrix: QRMatrix;
   theme: WorldTheme;
   seedText: string;
+  worldSeed: number;
   scanMode: boolean;
+  onCanvasReady?: (canvas: HTMLCanvasElement) => void;
 };
 
-export function WorldCanvas({ matrix, theme, seedText, scanMode }: WorldCanvasProps) {
+export function WorldCanvas({
+  matrix,
+  theme,
+  seedText,
+  worldSeed,
+  scanMode,
+  onCanvasReady,
+}: WorldCanvasProps) {
   const progress = useRef(scanMode ? 1 : 0);
 
   return (
@@ -23,7 +33,13 @@ export function WorldCanvas({ matrix, theme, seedText, scanMode }: WorldCanvasPr
       shadows
       dpr={[1, 2]}
       camera={{ position: [20, 24, 20], zoom: 18, near: 0.1, far: 1000 }}
-      gl={{ antialias: true, alpha: false, preserveDrawingBuffer: true }}
+      gl={{
+        antialias: true,
+        alpha: false,
+        preserveDrawingBuffer: true,
+        powerPreference: 'high-performance',
+      }}
+      onCreated={({ gl }) => onCanvasReady?.(gl.domElement)}
     >
       <color attach="background" args={[theme.sky]} />
       <ambientLight intensity={2.1} />
@@ -39,7 +55,19 @@ export function WorldCanvas({ matrix, theme, seedText, scanMode }: WorldCanvasPr
       <Suspense fallback={null}>
         <QRTerrain matrix={matrix} theme={theme} progress={progress} />
         <GroundDetails seedText={seedText} worldSize={matrix.size} theme={theme} progress={progress} />
-        <ProceduralTree seedText={seedText} theme={theme} progress={progress} />
+        <ProceduralBloom
+          matrix={matrix}
+          seedText={seedText}
+          worldSeed={worldSeed}
+          theme={theme}
+          progress={progress}
+        />
+        <Particles
+          seedText={seedText}
+          worldSize={matrix.size}
+          theme={theme}
+          progress={progress}
+        />
       </Suspense>
 
       <CameraRig target={scanMode ? 1 : 0} progress={progress} worldSize={matrix.size} />
