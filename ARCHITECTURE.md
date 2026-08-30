@@ -1,187 +1,167 @@
-# QR Worlds V3 architecture
+# QR Worlds V4 architecture
 
-QR Worlds is a static, client-only Vite application. The browser is the only
-runtime authority for user content, QR generation, verification, procedural
-generation, animation, URL state, and export.
+QR Worlds is a static, client-only Vite application. The browser owns QR generation, validation, deterministic world generation, interaction, URL state, and export.
 
 ## Product contract
 
-The Garden frame must stand on its own as a premium generative flowering tree.
-The QR is a discoverable state of that artwork, not a second layer placed under
-or over it. One reversible transition progress is the only visual clock.
+V4 uses one visual rule:
 
-Functional reliability remains independent from the artwork: QR encoding,
-quiet-zone recovery, canonical validation, and crisp exports do not depend on
-Three.js lighting or animation.
+> the QR matrix is the world.
+
+The 3D scene is not a decorative tree placed over a QR code and it is not a separate artwork that later morphs into one. Every QR module owns a voxel column. The isometric view reads as a tiny world; the orthographic top-down view reads as the original QR.
 
 ## Data flow
 
 ```text
 URL / text
-  ├─ 300 ms input debounce
-  ├─ QR generator (Byte + H)
-  │    └─ QRMatrix: boolean cells + 4–8 module quiet zone
-  ├─ canonical canvas -> @zxing/browser -> verification state
-  ├─ hash(content + worldSeed)
-  │    ├─ treeGenerator -> branch hierarchy + canopy clusters
-  │    ├─ botanicalGenerator -> deterministic leaves / flowers
-  │    └─ morphMapper
-  │         ├─ botanical carrier ↔ every dark QR module
-  │         ├─ finder priority timing
-  │         └─ scan transform / arc / stagger metadata
-  ├─ scene -> one shared transition progress
-  ├─ canonical PNG / SVG renderer
-  └─ URL serializer -> data + season + palette + seed
+  ↓
+generateQRMatrix()      Byte mode + EC H + quiet zone
+  ├─ canonical hidden canvas → @zxing/browser verification
+  └─ hash(content + seed)
+       ↓
+     generateVoxelWorld()
+       ↓
+     VoxelBlock[]
+       ├─ light path
+       ├─ cherry blossom
+       ├─ trunk
+       └─ grass
+       ↓
+     VoxelWorld (InstancedMesh)
+       ↓
+     CameraRig
+       ├─ isometric world
+       └─ top-down QR
 ```
 
-## Module boundaries
+Exports remain independent from WebGL: QR PNG/SVG uses a canonical black/white renderer.
 
-### QR domain
+## QR domain
 
-- `generateQR.ts` owns byte-mode H-level encoding and explicit quiet-zone cells.
-- `validateQR.ts` decodes a canonical hidden canvas and reports verified, low,
-  or unavailable.
-- `matrix.ts` owns pixel-perfect black/white raster output.
-- `downloadQR.ts` owns QR PNG/SVG, Garden PNG, and clipboard operations.
+- `generateQR.ts` owns H-level QR encoding and explicit quiet-zone cells.
+- `validateQR.ts` verifies a canonical hidden raster with `@zxing/browser`.
+- `matrix.ts` owns pixel-perfect QR raster output.
+- `downloadQR.ts` owns QR PNG/SVG, world PNG, and clipboard helpers.
 
-These modules do not import React or Three.js.
+These modules do not import Three.js.
 
-### Procedural domain
+## Voxel generation
 
-- `treeGenerator.ts` produces one biological hierarchy in fixed art-space:
-  trunk segments, primary curves, secondary curves, terminal clusters, and
-  stable bounds. It never receives QR coordinates.
-- `botanicalGenerator.ts` samples pointed leaves and blossoms inside the canopy
-  clusters. It receives only a requested count; matrix topology remains hidden.
-- `morphMapper.ts` is the only bridge from botanical art-space to matrix-space.
-  It gathers dark targets, detects the three 7 × 7 finder regions, assigns one
-  unique carrier to every dark target, and creates deterministic transition
-  metadata.
+`voxelWorldGenerator.ts` consumes the complete padded `QRMatrix`.
 
-Typical worlds use 2,200 carriers. If a valid dense matrix contains more than
-2,200 dark modules, the count rises to the dark-module count and element scale
-decreases to preserve the same crown mass. Matrix density therefore does not
-change the tree skeleton or camera composition.
+Every matrix cell receives a base voxel:
 
-### Scene domain
+- light module → warm ivory path voxel
+- dark module near the centre → trunk voxel
+- dark module inside the canopy radius → blossom voxel
+- dark module outside the canopy radius → grass voxel
 
-- `LivingTree.tsx` owns instanced branch, leaf, blossom, and blossom-center
-  meshes. It consumes generated immutable data and updates matrices directly in
-  the frame loop only while progress changes.
-- `morphGeometry.ts` creates low-vertex fan meshes whose botanical perimeter and
-  square scan perimeter share topology. Updating a few shared vertices changes
-  every instance from leaf/flower to module without swapping meshes.
-- `LivingGround.tsx` uses the same topology technique to become an irregular
-  root patch in Garden mode and the square white quiet-zone surface in QR mode.
-- `Particles.tsx` owns a bounded crown-local atmosphere and continuously fades
-  it during transition.
-- `CameraRig.tsx` advances the shared progress and derives camera position,
-  target, up vector, and orthographic zoom from it.
-- `WorldCanvas.tsx` wires renderer, lights, shared progress, and scene layers.
+Only dark modules receive additional vertical courses. Trunk modules stack upward into the stem; canopy modules stack into a radial dome with seeded raggedness; outer modules get restrained lawn relief.
 
-No scene child owns a second timeline or React state update inside `useFrame`.
+The important invariant is preserved:
 
-## Unified transition
+> a light QR module never gets a dark column and a dark QR module never gets a light top face.
 
-`progress.current` is reversible and clamped to `[0, 1]`. A complete trip takes
-1.55 seconds unless reduced motion is requested.
+That means the top-down view can reconstruct the source matrix without moving thousands of elements to new x/z targets.
 
-### 0.00–0.20 · Settle
+## Scene domain
 
-- Secondary growth and blossom centers begin folding inward.
-- Extra canopy carriers that do not own QR targets collapse toward the tree
-  core; they never travel to random matrix cells.
-- Camera framing starts to widen before distant finder targets move into place.
+- `VoxelWorld.tsx` renders four instanced cube groups using one `BoxGeometry` grammar.
+- `CameraRig.tsx` owns the single reversible progress value and derives camera position, target, up vector, and zoom.
+- `WorldCanvas.tsx` wires renderer, lighting, the shared progress ref, the voxel field, and the hidden interaction.
+- `VoxelBee.tsx` is a small long-press easter egg built from the same cube grammar.
+- `themes.ts` owns the restrained high-contrast palettes.
 
-### 0.04–0.62 · Recognize
+The previous botanical renderer remains in repository history but is no longer on the active render path.
 
-- Carriers mapped to the three finder regions move first.
-- Leaf and five-petal perimeter geometry begins becoming square.
-- Camera view already contains all three regions, so none assemble off-screen.
+## Perspective reveal
 
-### 0.12–0.93 · Assemble
+`progress.current` is clamped to `[0, 1]` and a full transition takes about 0.82 seconds unless reduced motion is requested.
 
-- Data carriers move along restrained curved paths to unique dark targets.
-- Organic rotations slerp to the horizontal scan orientation.
-- Branch levels retract secondary-first, trunk-last.
-- Botanical colors converge to the shared scan dark.
+```text
+0.0                         1.0
+isometric world  ───────→  top-down QR
+```
 
-### 0.27–1.00 · Lock
+The reveal is driven primarily by orientation, not by a particle-style rebuild:
 
-- The root patch expands and changes from an irregular fan to the white square.
-- Every mapped carrier reaches module scale and every extra reaches zero scale.
-- Camera reaches an exact top-down orthographic view.
-- Atmosphere and branch geometry reach zero continuously, without visibility
-  switches.
+- camera moves from isometric to vertical;
+- the up vector rotates into the scan orientation;
+- orthographic zoom changes from world framing to QR framing;
+- inter-cube gaps close slightly;
+- voxel colors converge from the world palette to black/white;
+- the light modules stop receiving scene shadows and gain emissive lift near the scan endpoint.
 
-The reverse path uses the same pure mapping, so a QR always blooms back into
-the same tree and can reverse cleanly in the middle of a transition.
+This creates the intended feeling that the QR was present the entire time.
 
-## Camera contract
+## Color grammar
 
-Garden framing is based on fixed tree art-space, not `matrix.size`. Payload
-length therefore cannot make the tree tiny. Scan framing alone uses padded
-matrix size. Orthographic zoom expands earlier than camera rotation so finder
-patterns remain in frame during assembly.
+Default Sakura intentionally uses a compact four-color family:
 
-Responsive CSS reserves roughly 70vh for desktop artwork and 60vh for mobile.
-The camera uses viewport-aware framing values rather than separate scene data.
+- near-white background
+- warm cream light modules
+- deep cherry blossom
+- bark brown
+- dark grass green
 
-## QR correctness contract
+Lighting supplies face variation. The geometry itself stays uniform.
 
-`QRMatrix.cells` includes the symbol and the complete light quiet zone. At
-progress 1:
+At the scan endpoint, all dark materials converge toward `#111111` and light modules converge toward white. This protects readability from theme choices.
 
-- one mapped carrier occupies every and only dark cell;
-- both leaf and flower fan geometries have become a square with matching
-  topology;
-- carriers use a slight 1.015 overlap to avoid antialias seams;
-- the ground is a white square spanning the padded matrix;
-- camera orientation is top-down and orthographic.
+## Interaction
 
-The exported PNG/SVG remains the canonical black/white implementation. Hidden
-decoding verifies that canonical output rather than claiming that every physical
-camera/display setup will succeed.
+Primary interaction:
 
-## Determinism contract
+- click/tap/Enter/Space → toggle world ↔ QR
 
-`hashString(content + ':' + worldSeed)` produces the base 32-bit seed. All
-procedural stages consume only `seededRandom`; scene generation never uses
-`Math.random()`. Content + seed recreates the same trunk, clusters, carriers,
-mapping, stagger, and color variation.
+Secondary controls:
 
-## Interaction and URL state
+- URL input remains visible
+- seasons, palettes, downloads, copy, and randomize live behind a single `•••` menu
 
-The artwork is the primary toggle and supports click, tap, Enter, and Space.
-The first-visit “Tap the world” hint appears after two seconds and stores only a
-local acknowledgement flag. Share URLs preserve `data`, `season`, `palette`,
-and `seed`, including legacy theme migration.
+Hidden interaction:
 
-## Performance policy
+- long press the world → a small voxel bee flies in and circles the canopy
 
-- Leaves, flowers, centers, and branch segments use shared geometry with
-  `InstancedMesh`.
-- Instance matrices and colors update only while progress changes.
-- Shared fan geometry contains tens of vertices, so profile morphing is cheap.
-- Particles are bounded and device-count aware.
-- Device pixel ratio is capped at 1.75.
-- Shadow casting is limited to woody geometry and flower centers; thin canopy
-  meshes avoid expensive noisy shadows.
-- WebGL is the required safe path; WebGPU is not a deployment dependency.
+The hidden interaction deliberately has no persistent UI label.
 
-## Error handling
+## Determinism
 
-- Oversized content keeps the last valid matrix and displays an actionable
-  message.
-- Low verification can expand quiet zone from four to six or eight modules.
-- Clipboard failure is surfaced near the controls.
-- Downloads remain disabled only until the WebGL canvas is available.
-- Reduced-motion users snap to the requested endpoint while retaining all
-  correctness properties.
+World variation derives from:
+
+```text
+hash(content + ':' + worldSeed + ':voxel')
+```
+
+The generator consumes only `seededRandom`; the same content + seed recreates the same voxel relief.
+
+## Performance
+
+- Four scene categories use `InstancedMesh`.
+- One shared box geometry language keeps geometry cost small.
+- Matrix transforms update only while the world/QR progress changes.
+- DPR is capped at 1.75.
+- The easter egg contains only a handful of cube meshes.
+- WebGL is the required deployment path; WebGPU is not required.
+
+## QR correctness
+
+`QRMatrix.cells` includes the full quiet zone. At progress 1:
+
+- the camera is orthographic and top-down;
+- light columns fill their complete module footprint;
+- dark columns fill their complete module footprint;
+- dark materials converge to a shared near-black;
+- light modules converge to white and ignore cast shadows;
+- the complete quiet zone remains light.
+
+The canonical PNG/SVG export remains the authority for downloadable QR correctness.
 
 ## Deployment
 
-`npm run build` runs TypeScript project checks and emits static assets to
-`dist/`. No server process or environment variable is required. `base: './'`
-keeps the output compatible with Vercel, Cloudflare Pages, Netlify, and GitHub
-Pages.
+```bash
+npm install
+npm run build
+```
+
+Vite emits static assets to `dist/`. No server, account, API key, database, or environment variable is required.
