@@ -142,7 +142,7 @@ export default function App() {
         <div className="hero-copy">
           <p>Every link hides a little world.</p>
           <h1>
-            Turn any link into a living,
+            Turn any link into a living,{' '}
             <span>scannable world.</span>
           </h1>
         </div>
