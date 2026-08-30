@@ -19,7 +19,7 @@ export function Controls({
     <div className="dock-actions">
       <button type="button" className="ghost-button" onClick={onRandomize}>
         <span aria-hidden="true">↻</span>
-        New bloom
+        New world
       </button>
       <button type="button" className="ghost-button" onClick={onShare}>
         <span aria-hidden="true">⌁</span>
@@ -27,7 +27,7 @@ export function Controls({
       </button>
       <button type="button" className="ghost-button" onClick={onDownloadGarden} disabled={!canDownloadGarden}>
         <span aria-hidden="true">↓</span>
-        Garden
+        World
       </button>
       <button type="button" className="primary-button" onClick={onDownloadQR}>
         <span aria-hidden="true">▦</span>

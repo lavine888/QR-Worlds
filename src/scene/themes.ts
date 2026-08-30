@@ -29,99 +29,97 @@ export const seasons: Array<{ name: SeasonName; label: string; glyph: string }> 
 ];
 
 export const palettes: Array<{ name: PaletteName; label: string; color: string }> = [
-  { name: 'pink', label: 'Pink', color: '#db83a4' },
-  { name: 'green', label: 'Green', color: '#4e8d68' },
-  { name: 'gold', label: 'Gold', color: '#c09243' },
-  { name: 'blue', label: 'Blue', color: '#6e9bc0' },
-  { name: 'white', label: 'White', color: '#dbe4e4' },
-  { name: 'lavender', label: 'Lavender', color: '#9a80c5' },
+  { name: 'pink', label: 'Cherry', color: '#a63f5b' },
+  { name: 'green', label: 'Forest', color: '#356b3a' },
+  { name: 'gold', label: 'Amber', color: '#b8782f' },
+  { name: 'blue', label: 'Blue', color: '#477c9e' },
+  { name: 'white', label: 'White', color: '#bfc7c5' },
+  { name: 'lavender', label: 'Lavender', color: '#80649d' },
 ];
 
 const basePalettes: Record<PaletteName, Omit<WorldTheme, 'name' | 'season' | 'palette' | 'label' | 'seasonLabel' | 'paletteLabel' | 'particleKind'>> = {
   pink: {
-    accent: '#d8749b',
-    darkTile: '#24493a',
-    lightTile: '#f0f2ec',
-    trunk: '#76513d',
-    leaf: '#5d8f61',
-    blossom: '#f0a9c3',
-    flower: '#d96891',
-    ground: '#f2efe8',
-    sky: '#faf9f5',
-    particle: '#efb1c5',
+    accent: '#a63f5b',
+    darkTile: '#111111',
+    lightTile: '#f7f0df',
+    trunk: '#5c321d',
+    leaf: '#29552a',
+    blossom: '#a63f5b',
+    flower: '#74263f',
+    ground: '#f7f0df',
+    sky: '#f7f7f7',
+    particle: '#b95773',
   },
   green: {
-    accent: '#4e8d68',
-    darkTile: '#173c2c',
-    lightTile: '#e9f0e8',
-    trunk: '#6c5239',
-    leaf: '#3f794f',
-    blossom: '#b9d4a5',
-    flower: '#7aa66a',
-    ground: '#edf2eb',
-    sky: '#f8faf6',
-    particle: '#b8d89f',
+    accent: '#356b3a',
+    darkTile: '#132d1a',
+    lightTile: '#f2efe2',
+    trunk: '#57351f',
+    leaf: '#2f6434',
+    blossom: '#6d8d48',
+    flower: '#496b31',
+    ground: '#f2efe2',
+    sky: '#f7f7f7',
+    particle: '#7a9957',
   },
   gold: {
-    accent: '#c09243',
-    darkTile: '#4b3827',
-    lightTile: '#f5edde',
-    trunk: '#69432f',
-    leaf: '#a8682c',
-    blossom: '#e5ad4c',
-    flower: '#c6822e',
-    ground: '#f3ebdf',
-    sky: '#fcf8f0',
-    particle: '#e1a33f',
+    accent: '#b8782f',
+    darkTile: '#3b2718',
+    lightTile: '#f6edd9',
+    trunk: '#57301d',
+    leaf: '#744b22',
+    blossom: '#bd7a2e',
+    flower: '#8f501f',
+    ground: '#f6edd9',
+    sky: '#f7f7f7',
+    particle: '#c98a3f',
   },
   blue: {
-    accent: '#6e9bc0',
-    darkTile: '#1c4156',
-    lightTile: '#edf5f8',
-    trunk: '#625850',
-    leaf: '#4f7e92',
-    blossom: '#bcd9ed',
-    flower: '#6d9fc0',
-    ground: '#edf3f5',
-    sky: '#f8fbfc',
-    particle: '#b6d8ec',
+    accent: '#477c9e',
+    darkTile: '#163244',
+    lightTile: '#eef3f2',
+    trunk: '#55443a',
+    leaf: '#315d68',
+    blossom: '#5f8fa8',
+    flower: '#345f79',
+    ground: '#eef3f2',
+    sky: '#f7f7f7',
+    particle: '#7aa3b8',
   },
   white: {
-    accent: '#9aa9ac',
-    darkTile: '#2d3a3e',
-    lightTile: '#f6f7f4',
-    trunk: '#6c665e',
-    leaf: '#9eaaa6',
-    blossom: '#ffffff',
-    flower: '#cbd8d4',
-    ground: '#f1f4f1',
-    sky: '#fbfcfa',
-    particle: '#ffffff',
+    accent: '#7d8987',
+    darkTile: '#28302f',
+    lightTile: '#f5f4ee',
+    trunk: '#5a5046',
+    leaf: '#687a72',
+    blossom: '#c6ceca',
+    flower: '#98a8a1',
+    ground: '#f5f4ee',
+    sky: '#f7f7f7',
+    particle: '#d9ddda',
   },
   lavender: {
-    accent: '#9a80c5',
-    darkTile: '#30284c',
-    lightTile: '#f1eff7',
-    trunk: '#665044',
-    leaf: '#69629a',
-    blossom: '#cfbee8',
-    flower: '#9a78c0',
-    ground: '#f0edf5',
-    sky: '#fbf9fd',
-    particle: '#d8c8ec',
+    accent: '#80649d',
+    darkTile: '#2e2338',
+    lightTile: '#f2eef3',
+    trunk: '#594033',
+    leaf: '#4e5f52',
+    blossom: '#8b6ea6',
+    flower: '#624879',
+    ground: '#f2eef3',
+    sky: '#f7f7f7',
+    particle: '#a88dbd',
   },
 };
 
 const seasonAdjustments: Record<SeasonName, {
-  leafFactor: number;
-  blossomFactor: number;
   particleKind: WorldTheme['particleKind'];
   groundTint: string;
 }> = {
-  spring: { leafFactor: 1, blossomFactor: 1, particleKind: 'petal', groundTint: '#f2efe8' },
-  summer: { leafFactor: 0.86, blossomFactor: 0.78, particleKind: 'pollen', groundTint: '#f0f0df' },
-  autumn: { leafFactor: 0.72, blossomFactor: 1.12, particleKind: 'leaf', groundTint: '#f2e8d8' },
-  winter: { leafFactor: 0.42, blossomFactor: 1.42, particleKind: 'snow', groundTint: '#edf3f5' },
+  spring: { particleKind: 'petal', groundTint: '#f7f0df' },
+  summer: { particleKind: 'pollen', groundTint: '#f1efdf' },
+  autumn: { particleKind: 'leaf', groundTint: '#f3e7d2' },
+  winter: { particleKind: 'snow', groundTint: '#edf1f1' },
 };
 
 export function getWorldTheme(season: SeasonName, palette: PaletteName): WorldTheme {
@@ -129,15 +127,25 @@ export function getWorldTheme(season: SeasonName, palette: PaletteName): WorldTh
   const adjustment = seasonAdjustments[season];
   const seasonLabel = seasons.find((item) => item.name === season)?.label ?? season;
   const paletteLabel = palettes.find((item) => item.name === palette)?.label ?? palette;
-  const leaf = season === 'autumn' || season === 'winter' ? base.blossom : base.leaf;
-  const blossom = season === 'autumn' ? base.flower : season === 'winter' ? '#ffffff' : base.blossom;
-  const flower = season === 'winter' ? base.lightTile : base.flower;
+
+  const leaf = season === 'autumn'
+    ? palette === 'pink' ? '#5e4a25' : base.flower
+    : season === 'winter'
+      ? '#59615e'
+      : base.leaf;
+  const blossom = season === 'autumn'
+    ? base.flower
+    : season === 'winter'
+      ? '#c7d0ce'
+      : base.blossom;
+  const flower = season === 'winter' ? base.darkTile : base.flower;
+
   return {
     ...base,
-    name: season + '-' + palette,
+    name: `${season}-${palette}`,
     season,
     palette,
-    label: seasonLabel + ' · ' + paletteLabel,
+    label: `${seasonLabel} · ${paletteLabel}`,
     seasonLabel,
     paletteLabel,
     ground: adjustment.groundTint,

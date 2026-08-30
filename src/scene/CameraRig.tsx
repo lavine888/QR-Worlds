@@ -15,7 +15,7 @@ const gardenTarget = new THREE.Vector3();
 const scanTarget = new THREE.Vector3();
 const lookTarget = new THREE.Vector3();
 
-const TRANSITION_SECONDS = 1.55;
+const TRANSITION_SECONDS = 0.82;
 
 function rangeProgress(value: number, start: number, end: number) {
   const local = THREE.MathUtils.clamp((value - start) / Math.max(0.001, end - start), 0, 1);
@@ -53,27 +53,26 @@ export function CameraRig({ target, progress, matrixSize }: CameraRigProps) {
       if (Math.abs(target - progress.current) < 0.001) progress.current = target;
     }
 
-    const p = rangeProgress(progress.current, 0.05, 0.94);
-    const zoomProgress = rangeProgress(progress.current, 0.02, 0.68);
-    garden.set(11.4, 9.4, 12.8);
-    scan.set(0, Math.max(34, matrixSize * 1.28), 0.001);
+    const p = rangeProgress(progress.current, 0.03, 0.97);
+    const world = matrixSize;
+
+    garden.set(world * 0.66, world * 0.58, world * 0.74);
+    scan.set(0, world * 1.55, 0.001);
     position.lerpVectors(garden, scan, p);
     camera.position.copy(position);
 
-    camera.up.set(0, 1 - p, -p).normalize();
-    gardenTarget.set(0, 5.62, 0);
+    gardenTarget.set(0, world * 0.13, 0);
     scanTarget.set(0, 0, 0);
     lookTarget.lerpVectors(gardenTarget, scanTarget, p);
+    camera.up.set(0, 1 - p, -p).normalize();
     camera.lookAt(lookTarget);
 
     if (camera instanceof THREE.OrthographicCamera) {
+      const minSide = Math.min(size.width, size.height);
       const compact = size.width < 640;
-      const gardenZoom = Math.min(
-        size.height / (compact ? 17.5 : 16),
-        size.width / (compact ? 15.6 : 13.8),
-      );
-      const scanZoom = Math.min(size.width, size.height) / (matrixSize * 1.1);
-      camera.zoom = THREE.MathUtils.lerp(gardenZoom, scanZoom, zoomProgress);
+      const gardenZoom = minSide / (world * (compact ? 1.02 : 0.82));
+      const scanZoom = minSide / (world * 1.08);
+      camera.zoom = THREE.MathUtils.lerp(gardenZoom, scanZoom, rangeProgress(p, 0.08, 0.9));
       camera.updateProjectionMatrix();
     }
   });
