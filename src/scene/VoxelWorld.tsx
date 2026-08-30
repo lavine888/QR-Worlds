@@ -1,5 +1,5 @@
 import { useFrame } from '@react-three/fiber';
-import { useLayoutEffect, useMemo, useRef, type MutableRefObject } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, type MutableRefObject } from 'react';
 import * as THREE from 'three';
 import { hashString } from '../procedural/hash';
 import {
@@ -66,7 +66,13 @@ export function VoxelWorld({ matrix, seedText, worldSeed, theme, progress }: Vox
   const blocks = useMemo(() => groupByKind(world.blocks), [world.blocks]);
 
   const lightMaterial = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: theme.lightTile, roughness: 0.93, metalness: 0 }),
+    () => new THREE.MeshStandardMaterial({
+      color: theme.lightTile,
+      emissive: '#ffffff',
+      emissiveIntensity: 0,
+      roughness: 0.93,
+      metalness: 0,
+    }),
     [theme.lightTile],
   );
   const blossomMaterial = useMemo(
@@ -93,6 +99,15 @@ export function VoxelWorld({ matrix, seedText, worldSeed, theme, progress }: Vox
     lastProgress.current = -1;
   }, [blocks, progress]);
 
+  useEffect(
+    () => () => {
+      lightMaterial.dispose();
+      blossomMaterial.dispose();
+      trunkMaterial.dispose();
+      grassMaterial.dispose();
+    }, [blossomMaterial, grassMaterial, lightMaterial, trunkMaterial],
+  );
+
   useFrame(() => {
     const p = THREE.MathUtils.clamp(progress.current, 0, 1);
     if (Math.abs(p - lastProgress.current) < 0.0002) return;
@@ -106,6 +121,8 @@ export function VoxelWorld({ matrix, seedText, worldSeed, theme, progress }: Vox
     const scanColorAmount = rangeProgress(p, 0.55, 0.98);
     workingColor.set(theme.lightTile).lerp(WHITE, scanColorAmount);
     lightMaterial.color.copy(workingColor);
+    lightMaterial.emissiveIntensity = scanColorAmount * 1.2;
+    if (lightRef.current) lightRef.current.receiveShadow = scanColorAmount < 0.72;
 
     workingColor.set(theme.blossom).lerp(DARK, scanColorAmount);
     blossomMaterial.color.copy(workingColor);
