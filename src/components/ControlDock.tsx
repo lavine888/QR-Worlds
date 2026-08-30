@@ -47,34 +47,39 @@ export function ControlDock({
 
   return (
     <section className="control-dock" onClick={(event) => event.stopPropagation()}>
-      <div className="input-row input-row-single">
-        <QRInput value={value} onChange={onValueChange} />
-      </div>
+      <QRInput value={value} onChange={onValueChange} />
 
-      <div className="utility-row">
-        <div className="world-pickers">
-          <SeasonPicker value={season} onChange={onSeasonChange} />
-          <PalettePicker value={palette} onChange={onPaletteChange} />
-        </div>
-        <div className="dock-utilities">
-          <div
-            className={'verification-pill ' + verification.status}
-            title={verification.message}
-            aria-live="polite"
-          >
-            <span className="verification-dot" />
-            <span>{verificationLabel}</span>
+      <details className="advanced-menu">
+        <summary aria-label="Open world controls">•••</summary>
+        <div className="advanced-panel">
+          <div className="world-pickers">
+            <SeasonPicker value={season} onChange={onSeasonChange} />
+            <PalettePicker value={palette} onChange={onPaletteChange} />
           </div>
-          <Controls
-            copied={copied}
-            canDownloadGarden={canDownloadGarden}
-            onShare={onShare}
-            onDownloadQR={onDownloadQR}
-            onDownloadGarden={onDownloadGarden}
-            onRandomize={onRandomize}
-          />
+
+          <div className="advanced-divider" />
+
+          <div className="dock-utilities">
+            <div
+              className={'verification-pill ' + verification.status}
+              title={verification.message}
+              aria-live="polite"
+            >
+              <span className="verification-dot" />
+              <span>{verificationLabel}</span>
+            </div>
+            <Controls
+              copied={copied}
+              canDownloadGarden={canDownloadGarden}
+              onShare={onShare}
+              onDownloadQR={onDownloadQR}
+              onDownloadGarden={onDownloadGarden}
+              onRandomize={onRandomize}
+            />
+          </div>
         </div>
-      </div>
+      </details>
+
       {shareError ? <p className="share-error">{shareError}</p> : null}
     </section>
   );
