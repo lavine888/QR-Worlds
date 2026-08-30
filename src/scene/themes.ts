@@ -39,13 +39,13 @@ export const palettes: Array<{ name: PaletteName; label: string; color: string }
 
 const basePalettes: Record<PaletteName, Omit<WorldTheme, 'name' | 'season' | 'palette' | 'label' | 'seasonLabel' | 'paletteLabel' | 'particleKind'>> = {
   pink: {
-    accent: '#db83a4',
+    accent: '#d8749b',
     darkTile: '#24493a',
     lightTile: '#f0f2ec',
     trunk: '#76513d',
-    leaf: '#6f956a',
-    blossom: '#f0b7cb',
-    flower: '#d77e9d',
+    leaf: '#5d8f61',
+    blossom: '#f0a9c3',
+    flower: '#d96891',
     ground: '#f2efe8',
     sky: '#faf9f5',
     particle: '#efb1c5',

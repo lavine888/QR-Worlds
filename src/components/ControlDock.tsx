@@ -9,7 +9,6 @@ type ControlDockProps = {
   value: string;
   season: SeasonName;
   palette: PaletteName;
-  scanMode: boolean;
   verification: QRVerification;
   copied: boolean;
   shareError: string;
@@ -17,7 +16,6 @@ type ControlDockProps = {
   onValueChange: (value: string) => void;
   onSeasonChange: (season: SeasonName) => void;
   onPaletteChange: (palette: PaletteName) => void;
-  onToggleMode: () => void;
   onDownloadQR: () => void;
   onDownloadGarden: () => void;
   onShare: () => void;
@@ -28,7 +26,6 @@ export function ControlDock({
   value,
   season,
   palette,
-  scanMode,
   verification,
   copied,
   shareError,
@@ -36,7 +33,6 @@ export function ControlDock({
   onValueChange,
   onSeasonChange,
   onPaletteChange,
-  onToggleMode,
   onDownloadQR,
   onDownloadGarden,
   onShare,
@@ -44,40 +40,40 @@ export function ControlDock({
 }: ControlDockProps) {
   const verificationLabel =
     verification.status === 'verified'
-      ? 'QR verified'
+      ? 'Ready to scan'
       : verification.status === 'unavailable'
-        ? 'Checking QR'
-        : 'QR low · recovering';
+        ? 'Checking scan'
+        : 'Improving contrast';
 
   return (
     <section className="control-dock" onClick={(event) => event.stopPropagation()}>
-      <div className="input-row">
+      <div className="input-row input-row-single">
         <QRInput value={value} onChange={onValueChange} />
-        <button className="mode-button" type="button" onClick={onToggleMode}>
-          <span aria-hidden="true">{scanMode ? '✦' : '⌗'}</span>
-          {scanMode ? 'Garden view' : 'Scan view'}
-        </button>
       </div>
 
-      <div className="selection-row">
-        <SeasonPicker value={season} onChange={onSeasonChange} />
-        <PalettePicker value={palette} onChange={onPaletteChange} />
-      </div>
-
-      <div className="dock-bottom">
-        <div className={'verification-pill ' + verification.status}>
-          <span className="verification-dot" />
-          <span>{verificationLabel}</span>
-          <span className="verification-copy">{verification.message}</span>
+      <div className="utility-row">
+        <div className="world-pickers">
+          <SeasonPicker value={season} onChange={onSeasonChange} />
+          <PalettePicker value={palette} onChange={onPaletteChange} />
         </div>
-        <Controls
-          copied={copied}
-          canDownloadGarden={canDownloadGarden}
-          onShare={onShare}
-          onDownloadQR={onDownloadQR}
-          onDownloadGarden={onDownloadGarden}
-          onRandomize={onRandomize}
-        />
+        <div className="dock-utilities">
+          <div
+            className={'verification-pill ' + verification.status}
+            title={verification.message}
+            aria-live="polite"
+          >
+            <span className="verification-dot" />
+            <span>{verificationLabel}</span>
+          </div>
+          <Controls
+            copied={copied}
+            canDownloadGarden={canDownloadGarden}
+            onShare={onShare}
+            onDownloadQR={onDownloadQR}
+            onDownloadGarden={onDownloadGarden}
+            onRandomize={onRandomize}
+          />
+        </div>
       </div>
       {shareError ? <p className="share-error">{shareError}</p> : null}
     </section>

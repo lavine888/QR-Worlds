@@ -83,10 +83,10 @@ vertex pattern, with per-block data read from storage buffers using
 `@builtin(vertex_index)`. The vertex shader hides unused blocks, calculates
 cube faces, and performs debris ballistics without mutating the block buffers.
 
-QR Worlds uses the web-friendly Three.js equivalent: shared low-poly geometry
-and `InstancedMesh` for QR tiles, branches, leaves, blossoms, grass, flowers,
-and seasonal particles. This keeps React out of the per-object update loop and
-lets the browser renderer manage the scene on both desktop and mobile.
+QR Worlds uses the web-friendly Three.js equivalent: shared low-vertex morph
+geometry and `InstancedMesh` for branch segments, leaves, blossoms, blossom
+centers, and seasonal particles. Every dark target receives a botanical
+carrier, while React stays out of the per-object update loop.
 
 ## 7. Shaders
 
@@ -118,6 +118,10 @@ plus bounded instance buffers for the web fallback path.
 - MIT-licensed project code with no copied source from the reference;
 - actual H-level QR generation, explicit quiet-zone preservation, and hidden
   canvas decoding with `@zxing/browser`;
+- a QR-independent hierarchical tree generator plus a separate deterministic
+  botanical-to-module mapping;
+- pointed leaf and five-petal geometry whose silhouette continuously changes into
+  square scan modules instead of a persistent tiled board;
 - deterministic tree seed derived from the input plus an explicit tree variant;
 - separate Spring / Summer / Autumn / Winter seasons and six named palettes;
 - QR-safe black/white scan mode and 1024px PNG export;

@@ -1,80 +1,89 @@
 # QR Worlds
 
-> Turn any QR code into a tiny, living garden.
+> Turn any link into a living, scannable world.
 
-QR Worlds is a client-only generative art experiment. It turns a real,
-error-corrected QR matrix into a small 3D diorama, then morphs that same
-surface into a clean scan view. Type a URL or text, choose a season and
-palette, and tap the scene to move between the garden and the QR.
+QR Worlds is a client-only generative artwork that hides a real QR code inside
+a flowering 3D tree. The first frame is a garden, not a decorated QR board.
+Tap the world and the same leaves and blossoms gather into a clean, scannable
+matrix; tap again and the code blooms back into the same deterministic tree.
 
-## Included
+[Open the live demo](https://qr-worlds.vercel.app/)
 
-- Real QR generation in byte mode with error correction level H.
-- An explicit four-module quiet zone, with automatic recovery up to eight
-  modules when hidden validation needs more room.
-- Hidden-canvas validation through @zxing/browser; the interface reports
-  verified, recovering, or unavailable instead of silently claiming success.
-- One shared transition progress for the orthographic camera, tile height and
-  spacing, contrast, QR-rooted square bloom, grass, wind, and seasonal
-  particles.
-- Deterministic growth rooted in the QR's dark modules. Each selected dark
-  module becomes a square flower tile that rises into a central bloom canopy;
-  selected roots also grow restrained stems and foliage. A shareable world
-  seed controls the variation.
-- Spring, Summer, Autumn, and Winter controls.
+## Garden → Morph → QR
+
+### Garden
+
+One curved trunk grows into primary and secondary branches. Thousands of
+pointed leaves and five-petal blossoms form overlapping canopy clusters, with
+seasonal color, restrained atmosphere, and a stable art-directed silhouette.
+The QR plane, finder patterns, module grid, and quiet-zone boundary are not
+rendered in this state.
+
+### Morph
+
+There is no Tree/QRCode visibility swap. One reversible progress value drives
+the camera, botanical transforms, branch retraction, ground shape, atmosphere,
+geometry profile, and material contrast over 1.55 seconds. Botanical carriers
+assigned to the three finder regions settle first; data modules follow. Extra
+canopy matter folds toward the tree core instead of exploding off-screen.
+
+### QR
+
+Every dark module is occupied by a mapped botanical carrier whose pointed or
+petaled profile has continuously flattened into a square. The ground patch has
+become the white scan surface, including the full quiet zone, and the camera is
+orthographic and top-down. PNG and SVG exports use a separate crisp renderer so
+lighting can never affect exported QR pixels.
+
+## Features
+
+- Real byte-mode QR generation with error correction level H.
+- Explicit four-module quiet zone, with automatic recovery up to eight modules
+  when in-browser verification needs more room.
+- Hidden-canvas verification with `@zxing/browser`; failures are surfaced rather
+  than silently treated as success.
+- Deterministic tree structure, canopy, and morph mapping from content + seed.
+- A hierarchical trunk, 10–13 primary branches, 2–5 secondary branches per
+  primary, and 20–26 terminal canopy clusters.
+- Typically 2,200 instanced botanical carriers, increasing only when a dense QR
+  needs one carrier per dark module.
+- Custom leaf and five-petal fan geometries whose silhouettes continuously become square QR
+  modules at the scan endpoint.
+- Finder-pattern-first morph timing and reversible mid-transition interaction.
+- Spring, Summer, Autumn, and Winter seasons.
 - Pink, Green, Gold, Blue, White, and Lavender palettes.
-- Instanced QR modules, square bloom tiles, branches, leaves, blossoms, grass,
-  and flowers, plus a bounded point-particle layer.
-- A crisp 1024 x 1024 QR PNG, SVG export, and a Garden PNG from the WebGL
-  drawing buffer.
-- Share links containing data, season, palette, and seed.
-- Responsive controls, keyboard-accessible scene toggling, and a WebGL path
-  that does not require WebGPU.
-
-The QR PNG and the scan endpoint are intentionally plain black-and-white. The
-decorative garden is allowed to be expressive; the export remains scanner
-friendly.
+- Share links containing content, season, palette, and world seed.
+- 1024 × 1024 QR PNG, SVG, and WebGL Garden PNG downloads.
+- Responsive desktop/mobile framing, keyboard activation, reduced-motion
+  handling, and a WebGL path that does not require WebGPU.
+- No accounts, API, upload, analytics, database, or environment variables.
 
 ## Stack
 
 - React 19 + TypeScript + Vite
 - Three.js + React Three Fiber
-- qrcode-generator
-- @zxing/browser
+- `qrcode-generator`
+- `@zxing/browser`
 
 ## Run locally
 
-~~~bash
+```bash
 npm install
 npm run dev
-~~~
+```
 
 Production build:
 
-~~~bash
+```bash
 npm run build
 npm run preview
-~~~
+```
 
-The Vite output directory is dist/.
-
-## Deploy
-
-QR Worlds is a static site and can be deployed to Vercel, Cloudflare Pages,
-Netlify, or GitHub Pages.
-
-- Build command: npm run build
-- Output directory: dist
-- Required environment variables: none
-
-The Vercel project dashboard supplied for the current deployment is
-[lavine/qr-worlds](https://vercel.com/lavine/qr-worlds). The public deployment
-hostname is environment-specific, so this repository does not hard-code an
-unverified URL.
+Vite writes the static site to `dist/`.
 
 ## Architecture
 
-~~~text
+```text
 src/
 ├── components/
 │   ├── ControlDock.tsx
@@ -86,9 +95,11 @@ src/
 │   ├── useQR.ts
 │   └── useScene.ts
 ├── procedural/
+│   ├── botanicalGenerator.ts
 │   ├── hash.ts
+│   ├── morphMapper.ts
 │   ├── random.ts
-│   └── worldGenerator.ts
+│   └── treeGenerator.ts
 ├── qr/
 │   ├── downloadQR.ts
 │   ├── generateQR.ts
@@ -96,34 +107,39 @@ src/
 │   └── validateQR.ts
 ├── scene/
 │   ├── CameraRig.tsx
-│   ├── GroundDetails.tsx
+│   ├── LivingGround.tsx
+│   ├── LivingTree.tsx
+│   ├── morphGeometry.ts
 │   ├── Particles.tsx
-│   ├── ProceduralBloom.tsx
-│   ├── QRTerrain.tsx
-│   ├── WorldCanvas.tsx
 │   ├── themes.ts
-│   └── wind.ts
+│   └── WorldCanvas.tsx
 ├── App.tsx
 ├── main.tsx
 └── styles.css
-~~~
+```
 
-ARCHITECTURE.md defines the data flow, renderer policy, transition contract,
-determinism boundary, and deployment assumptions. REFERENCE_ANALYSIS.md
-records the public creative-coding reference that informed the interaction
-model and the independent implementation boundary.
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for boundaries, transition phases,
+correctness contracts, and performance policy. [V3_VISUAL_AUDIT.md](./V3_VISUAL_AUDIT.md)
+records the evidence and decisions behind the visual rewrite.
 
-## Privacy and limitations
+## Deploy
 
-All content stays in the browser. QR generation, validation, scene generation,
-sharing, and export do not call an application server. A very long payload can
-exceed the H-level QR capacity; in that case the last usable QR remains visible
-and the input receives an actionable error.
+QR Worlds is a static site suitable for Vercel, Cloudflare Pages, Netlify, or
+GitHub Pages.
 
-Physical-camera scan quality still depends on the device, display brightness,
-focus, and viewing distance. The hidden decoder verifies the plain QR export;
-it cannot replace acceptance testing with the camera hardware that will be
-used in production.
+- Build command: `npm run build`
+- Output directory: `dist`
+- Required environment variables: none
+
+## Privacy and scan reliability
+
+QR generation, validation, scene generation, sharing, and export all happen in
+the browser. Links and text are never sent to an application server. If an input
+exceeds the H-level encoder capacity, the last valid world remains visible and
+the interface asks for shorter content.
+
+Software decoding validates the canonical QR output. Physical scan quality can
+still vary with camera focus, display brightness, glare, and viewing distance.
 
 ## License
 

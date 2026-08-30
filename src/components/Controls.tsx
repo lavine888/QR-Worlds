@@ -18,16 +18,20 @@ export function Controls({
   return (
     <div className="dock-actions">
       <button type="button" className="ghost-button" onClick={onRandomize}>
-        Randomize world
+        <span aria-hidden="true">↻</span>
+        New bloom
       </button>
       <button type="button" className="ghost-button" onClick={onShare}>
-        {copied ? 'Copied' : 'Copy link'}
+        <span aria-hidden="true">⌁</span>
+        {copied ? 'Copied' : 'Copy'}
       </button>
       <button type="button" className="ghost-button" onClick={onDownloadGarden} disabled={!canDownloadGarden}>
-        Garden PNG
+        <span aria-hidden="true">↓</span>
+        Garden
       </button>
       <button type="button" className="primary-button" onClick={onDownloadQR}>
-        QR PNG
+        <span aria-hidden="true">▦</span>
+        QR
       </button>
     </div>
   );

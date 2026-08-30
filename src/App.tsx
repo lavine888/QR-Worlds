@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { ControlDock } from './components/ControlDock';
 import { useQR } from './hooks/useQR';
 import { useSceneCanvas } from './hooks/useScene';
@@ -18,6 +18,8 @@ const legacyThemeMap: Record<string, { season: SeasonName; palette: PaletteName 
   autumn: { season: 'autumn', palette: 'gold' },
   snow: { season: 'winter', palette: 'blue' },
 };
+
+const HINT_STORAGE_KEY = 'qr-worlds:v3-interacted';
 
 function isSeason(value: string | null): value is SeasonName {
   return value === 'spring' || value === 'summer' || value === 'autumn' || value === 'winter';
@@ -58,11 +60,36 @@ export default function App() {
   const [scanMode, setScanMode] = useState(false);
   const [copied, setCopied] = useState(false);
   const [shareError, setShareError] = useState('');
+  const [showTapHint, setShowTapHint] = useState(false);
+  const [hintAcknowledged, setHintAcknowledged] = useState(false);
   const { canvasRef, canvasReady, onCanvasReady } = useSceneCanvas();
-  const { debouncedValue, matrix, error, quietZone, verification } = useQR(value);
+  const { debouncedValue, matrix, error, verification } = useQR(value);
   const theme = getWorldTheme(season, palette);
 
-  const toggleMode = () => setScanMode((current) => !current);
+  useEffect(() => {
+    if (hintAcknowledged) return;
+    try {
+      if (window.localStorage.getItem(HINT_STORAGE_KEY)) {
+        setHintAcknowledged(true);
+        return;
+      }
+    } catch {
+      // The hint can still appear when storage is unavailable.
+    }
+    const timer = window.setTimeout(() => setShowTapHint(true), 2000);
+    return () => window.clearTimeout(timer);
+  }, [hintAcknowledged]);
+
+  const toggleMode = () => {
+    setScanMode((current) => !current);
+    setShowTapHint(false);
+    setHintAcknowledged(true);
+    try {
+      window.localStorage.setItem(HINT_STORAGE_KEY, '1');
+    } catch {
+      // Interaction remains fully functional without persistent storage.
+    }
+  };
   const handleCanvasKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
@@ -98,9 +125,9 @@ export default function App() {
             <i />
           </span>
           <span>QR Worlds</span>
-          <span className="version-tag">V2</span>
+          <span className="version-tag">V3</span>
         </a>
-        <div className="topbar-copy">Turn any QR code into a tiny world.</div>
+        <div className="topbar-copy">Every link hides a little world.</div>
         <a
           className="github-link"
           href="https://github.com/lavine888/QR-Worlds"
@@ -112,13 +139,20 @@ export default function App() {
       </header>
 
       <section className="hero">
+        <div className="hero-copy">
+          <p>Every link hides a little world.</p>
+          <h1>
+            Turn any link into a living,
+            <span>scannable world.</span>
+          </h1>
+        </div>
         <div
           className="canvas-card"
           onClick={toggleMode}
           onKeyDown={handleCanvasKeyDown}
           role="button"
           tabIndex={0}
-          aria-label={scanMode ? 'Switch to garden view' : 'Switch to scan view'}
+          aria-label={scanMode ? 'Bloom back into a living tree' : 'Reveal the hidden QR code'}
         >
           <WorldCanvas
             matrix={matrix}
@@ -128,15 +162,12 @@ export default function App() {
             scanMode={scanMode}
             onCanvasReady={onCanvasReady}
           />
-          <div className="mode-hint">
-            <span className={'status-dot ' + (scanMode ? 'scan' : '')} />
-            {scanMode ? 'Scan mode · tap to grow' : 'Garden mode · tap to reveal QR'}
-          </div>
-          <div className="qr-meta">
-            <span>{matrix.moduleCount}×{matrix.moduleCount}</span>
-            <span>EC · {matrix.errorCorrectionLevel}</span>
-            <span>Quiet zone · {quietZone}</span>
-          </div>
+          {showTapHint ? (
+            <div className="tap-hint" aria-hidden="true">
+              <span />
+              Tap the world
+            </div>
+          ) : null}
         </div>
 
         {error ? <div className="error-banner">{error}</div> : null}
@@ -145,7 +176,6 @@ export default function App() {
           value={value}
           season={season}
           palette={palette}
-          scanMode={scanMode}
           verification={verification}
           copied={copied}
           shareError={shareError}
@@ -153,7 +183,6 @@ export default function App() {
           onValueChange={setValue}
           onSeasonChange={setSeason}
           onPaletteChange={setPalette}
-          onToggleMode={toggleMode}
           onDownloadQR={() => downloadQRPng(matrix)}
           onDownloadGarden={() => {
             if (canvasRef.current) downloadGardenPng(canvasRef.current);
@@ -164,8 +193,8 @@ export default function App() {
       </section>
 
       <footer className="footer">
-        <span>Generated locally in your browser.</span>
-        <span>No links or text are uploaded.</span>
+        <span>Private by design · generated entirely in your browser.</span>
+        <span>Open source on GitHub.</span>
       </footer>
     </main>
   );

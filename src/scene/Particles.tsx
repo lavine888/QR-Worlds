@@ -1,4 +1,4 @@
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import { useMemo, useRef, type MutableRefObject } from 'react';
 import * as THREE from 'three';
 import { hashString } from '../procedural/hash';
@@ -7,7 +7,6 @@ import type { WorldTheme } from './themes';
 
 type ParticlesProps = {
   seedText: string;
-  worldSize: number;
   theme: WorldTheme;
   progress: MutableRefObject<number>;
 };
@@ -18,26 +17,27 @@ type ParticleField = {
   phases: Float32Array;
 };
 
-export function Particles({ seedText, worldSize, theme, progress }: ParticlesProps) {
+export function Particles({ seedText, theme, progress }: ParticlesProps) {
   const ref = useRef<THREE.Points>(null);
+  const { size } = useThree();
+  const compact = size.width < 640;
   const field = useMemo<ParticleField>(() => {
     const random = seededRandom(hashString(seedText + ':particles:' + theme.particleKind));
-    const count = theme.particleKind === 'pollen' ? 170 : 220;
+    const count = compact ? 72 : theme.particleKind === 'pollen' ? 92 : 118;
     const positions = new Float32Array(count * 3);
     const velocities = new Float32Array(count);
     const phases = new Float32Array(count);
-    const half = worldSize * 0.64;
     for (let index = 0; index < count; index += 1) {
-      positions[index * 3] = (random() * 2 - 1) * half;
-      positions[index * 3 + 1] = 1.3 + random() * 7.2;
-      positions[index * 3 + 2] = (random() * 2 - 1) * half;
-      velocities[index] = 0.04 + random() * 0.13;
+      positions[index * 3] = (random() * 2 - 1) * 5.4;
+      positions[index * 3 + 1] = 2.5 + random() * 8.8;
+      positions[index * 3 + 2] = (random() * 2 - 1) * 4.7;
+      velocities[index] = 0.035 + random() * 0.085;
       phases[index] = random() * Math.PI * 2;
     }
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     return { geometry, velocities, phases };
-  }, [seedText, theme.particleKind, worldSize]);
+  }, [compact, seedText, theme.particleKind]);
 
   useFrame((state, delta) => {
     const points = ref.current;
@@ -45,22 +45,20 @@ export function Particles({ seedText, worldSize, theme, progress }: ParticlesPro
     const p = THREE.MathUtils.smoothstep(progress.current, 0, 1);
     const attribute = field.geometry.getAttribute('position') as THREE.BufferAttribute;
     const positions = attribute.array as Float32Array;
-    const half = worldSize * 0.7;
-    points.visible = p < 0.96;
     const material = points.material as THREE.PointsMaterial;
-    material.opacity = Math.max(0, 0.52 * (1 - p));
-    if (p >= 0.96) return;
+    material.opacity = Math.max(0, 0.34 * (1 - THREE.MathUtils.smootherstep(p, 0.05, 0.62)));
+    if (p >= 0.995) return;
 
     for (let index = 0; index < field.velocities.length; index += 1) {
       const offset = index * 3;
       positions[offset + 1] -= field.velocities[index] * delta;
-      positions[offset] += Math.sin(state.clock.elapsedTime * 0.55 + field.phases[index]) * delta * 0.12;
-      positions[offset + 2] += Math.cos(state.clock.elapsedTime * 0.4 + field.phases[index]) * delta * 0.08;
-      if (positions[offset + 1] < 0.45) positions[offset + 1] = 8.5;
-      if (positions[offset] > half) positions[offset] = -half;
-      if (positions[offset] < -half) positions[offset] = half;
-      if (positions[offset + 2] > half) positions[offset + 2] = -half;
-      if (positions[offset + 2] < -half) positions[offset + 2] = half;
+      positions[offset] += Math.sin(state.clock.elapsedTime * 0.48 + field.phases[index]) * delta * 0.07;
+      positions[offset + 2] += Math.cos(state.clock.elapsedTime * 0.36 + field.phases[index]) * delta * 0.05;
+      if (positions[offset + 1] < 1.6) positions[offset + 1] = 11.4;
+      if (positions[offset] > 5.8) positions[offset] = -5.8;
+      if (positions[offset] < -5.8) positions[offset] = 5.8;
+      if (positions[offset + 2] > 5.1) positions[offset + 2] = -5.1;
+      if (positions[offset + 2] < -5.1) positions[offset + 2] = 5.1;
     }
     attribute.needsUpdate = true;
   });
@@ -69,9 +67,9 @@ export function Particles({ seedText, worldSize, theme, progress }: ParticlesPro
     <points ref={ref} geometry={field.geometry}>
       <pointsMaterial
         color={theme.particle}
-        size={theme.particleKind === 'snow' ? 0.13 : 0.09}
+        size={theme.particleKind === 'snow' ? 0.105 : 0.065}
         transparent
-        opacity={0.52}
+        opacity={0.34}
         depthWrite={false}
         sizeAttenuation
       />

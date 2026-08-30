@@ -15,18 +15,23 @@ export function validateQR(matrix: QRMatrix): QRVerification {
       message: 'QR verification is only available in a browser',
     };
   }
-  try {
-    const reader = new BrowserQRCodeReader();
-    const result = reader.decodeFromCanvas(createQRCanvas(matrix, 1024));
-    const decoded = result.getText();
-    if (decoded === matrix.content) {
-      return { status: 'verified', decoded, message: 'QR verified' };
+  const reader = new BrowserQRCodeReader();
+  let decodedMismatch = '';
+  for (const modulePixels of [12, 16, 20]) {
+    try {
+      const result = reader.decodeFromCanvas(
+        createQRCanvas(matrix, matrix.size * modulePixels),
+      );
+      const decoded = result.getText();
+      if (decoded === matrix.content) {
+        return { status: 'verified', decoded, message: 'QR verified' };
+      }
+      decodedMismatch = decoded;
+    } catch {
+      // Detector sensitivity varies by matrix version, so retry another exact pitch.
     }
-    return { status: 'low', decoded, message: 'QR decoded with different text' };
-  } catch {
-    return {
-      status: 'low',
-      message: 'QR needs a little more contrast or quiet space',
-    };
   }
+  return decodedMismatch
+    ? { status: 'low', decoded: decodedMismatch, message: 'QR decoded with different text' }
+    : { status: 'low', message: 'QR needs a little more contrast or quiet space' };
 }
