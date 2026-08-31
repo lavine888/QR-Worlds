@@ -5,15 +5,16 @@ type QRInputProps = {
 
 export function QRInput({ value, onChange }: QRInputProps) {
   return (
-    <label className="url-field">
-      <span className="url-icon" aria-hidden="true">↗</span>
+    <label className="reference-field">
       <span className="sr-only">QR content</span>
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
         aria-label="QR content"
-        placeholder="Paste a URL or type anything"
+        placeholder="https://qr-worlds.vercel.app/"
         spellCheck={false}
+        autoCapitalize="none"
+        autoCorrect="off"
       />
     </label>
   );
