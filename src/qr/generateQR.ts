@@ -1,6 +1,6 @@
 import qrcode from 'qrcode-generator';
 
-export const DEFAULT_CONTENT = 'https://qr-worlds.vercel.app';
+export const DEFAULT_CONTENT = 'https://github.com/lavine888/QR-Worlds';
 export const QR_ERROR_CORRECTION = 'H' as const;
 export const MIN_QUIET_ZONE = 4;
 

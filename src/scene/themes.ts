@@ -29,7 +29,7 @@ export const seasons: Array<{ name: SeasonName; label: string; glyph: string }> 
 ];
 
 export const palettes: Array<{ name: PaletteName; label: string; color: string }> = [
-  { name: 'pink', label: 'Cherry', color: '#9b3151' },
+  { name: 'pink', label: 'Cherry', color: '#a63f5b' },
   { name: 'green', label: 'Forest', color: '#356b3a' },
   { name: 'gold', label: 'Amber', color: '#b8782f' },
   { name: 'blue', label: 'Blue', color: '#477c9e' },
@@ -39,16 +39,16 @@ export const palettes: Array<{ name: PaletteName; label: string; color: string }
 
 const basePalettes: Record<PaletteName, Omit<WorldTheme, 'name' | 'season' | 'palette' | 'label' | 'seasonLabel' | 'paletteLabel' | 'particleKind'>> = {
   pink: {
-    accent: '#9b3151',
+    accent: '#a63f5b',
     darkTile: '#111111',
-    lightTile: '#f8f0df',
-    trunk: '#5b301c',
-    leaf: '#2e652d',
-    blossom: '#9b3151',
-    flower: '#701f3c',
-    ground: '#f8f0df',
+    lightTile: '#f7f0df',
+    trunk: '#5c321d',
+    leaf: '#29552a',
+    blossom: '#a63f5b',
+    flower: '#74263f',
+    ground: '#f7f0df',
     sky: '#f7f7f7',
-    particle: '#b74665',
+    particle: '#b95773',
   },
   green: {
     accent: '#356b3a',
@@ -116,7 +116,7 @@ const seasonAdjustments: Record<SeasonName, {
   particleKind: WorldTheme['particleKind'];
   groundTint: string;
 }> = {
-  spring: { particleKind: 'petal', groundTint: '#f8f0df' },
+  spring: { particleKind: 'petal', groundTint: '#f7f0df' },
   summer: { particleKind: 'pollen', groundTint: '#f1efdf' },
   autumn: { particleKind: 'leaf', groundTint: '#f3e7d2' },
   winter: { particleKind: 'snow', groundTint: '#edf1f1' },

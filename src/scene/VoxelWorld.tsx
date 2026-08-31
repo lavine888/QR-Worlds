@@ -1,11 +1,5 @@
 import { useFrame } from '@react-three/fiber';
-import {
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  type MutableRefObject,
-} from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, type MutableRefObject } from 'react';
 import * as THREE from 'three';
 import { hashString } from '../procedural/hash';
 import {
@@ -24,21 +18,13 @@ type VoxelWorldProps = {
   progress: MutableRefObject<number>;
 };
 
-const ISO_ANGLE_Y = 0.78;
-const ISO_ANGLE_X = -0.55;
-const FLAT_ANGLE_Y = 0;
-const FLAT_ANGLE_X = -Math.PI / 2;
-const SCAN_DARK = new THREE.Color('#111111');
-const SCAN_LIGHT = new THREE.Color('#ffffff');
 const dummy = new THREE.Object3D();
+const WHITE = new THREE.Color('#ffffff');
+const DARK = new THREE.Color('#111111');
 const workingColor = new THREE.Color();
 
 function rangeProgress(value: number, start: number, end: number) {
-  const local = THREE.MathUtils.clamp(
-    (value - start) / Math.max(0.001, end - start),
-    0,
-    1,
-  );
+  const local = THREE.MathUtils.clamp((value - start) / Math.max(0.001, end - start), 0, 1);
   return THREE.MathUtils.smootherstep(local, 0, 1);
 }
 
@@ -53,112 +39,65 @@ function groupByKind(blocks: VoxelBlock[]) {
   return grouped;
 }
 
-function gardenColor(item: VoxelBlock, theme: WorldTheme) {
-  const base =
-    item.kind === 'light'
-      ? theme.lightTile
-      : item.kind === 'blossom'
-        ? theme.blossom
-        : item.kind === 'trunk'
-          ? theme.trunk
-          : theme.leaf;
-
-  const color = new THREE.Color(base);
-  const centered = item.tone - 0.5;
-
-  if (item.kind === 'light') {
-    color.offsetHSL(centered * 0.01, -0.02, centered * 0.1);
-  } else if (item.kind === 'blossom') {
-    color.offsetHSL(centered * 0.012, 0.035, centered * 0.19 - 0.035);
-  } else if (item.kind === 'trunk') {
-    color.offsetHSL(centered * 0.009, 0.025, centered * 0.15 - 0.045);
-  } else {
-    color.offsetHSL(centered * 0.014, 0.03, centered * 0.14 - 0.035);
-  }
-
-  return color;
-}
-
-function writeBlocks(
-  mesh: THREE.InstancedMesh | null,
-  items: VoxelBlock[],
-  theme: WorldTheme,
-  progress: number,
-) {
+function writeBlocks(mesh: THREE.InstancedMesh | null, items: VoxelBlock[], progress: number) {
   if (!mesh) return;
-  const scanAmount = rangeProgress(progress, 0.58, 0.98);
+  const fill = THREE.MathUtils.lerp(0.92, 1, rangeProgress(progress, 0.34, 0.9));
+  const height = THREE.MathUtils.lerp(0.94, 0.995, rangeProgress(progress, 0.46, 0.96));
 
   items.forEach((item, index) => {
     dummy.position.set(item.x, item.y + 0.5, item.z);
+    const gardenJitter = 1 + (item.tone - 0.5) * 0.035 * (1 - progress);
+    dummy.scale.set(fill * gardenJitter, height, fill * gardenJitter);
     dummy.rotation.set(0, 0, 0);
-    dummy.scale.set(1, 1, 1);
     dummy.updateMatrix();
     mesh.setMatrixAt(index, dummy.matrix);
-
-    const base = gardenColor(item, theme);
-    const endpoint = item.kind === 'light' ? SCAN_LIGHT : SCAN_DARK;
-    workingColor.copy(base).lerp(endpoint, scanAmount);
-    mesh.setColorAt(index, workingColor);
   });
-
   mesh.instanceMatrix.needsUpdate = true;
-  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
 }
 
-function createMaterial() {
-  return new THREE.MeshStandardMaterial({
-    color: '#ffffff',
-    roughness: 0.94,
-    metalness: 0,
-    vertexColors: true,
-  });
-}
-
-export function VoxelWorld({
-  matrix,
-  seedText,
-  worldSeed,
-  theme,
-  progress,
-}: VoxelWorldProps) {
-  const groupRef = useRef<THREE.Group>(null);
+export function VoxelWorld({ matrix, seedText, worldSeed, theme, progress }: VoxelWorldProps) {
   const lightRef = useRef<THREE.InstancedMesh>(null);
   const blossomRef = useRef<THREE.InstancedMesh>(null);
   const trunkRef = useRef<THREE.InstancedMesh>(null);
   const grassRef = useRef<THREE.InstancedMesh>(null);
   const lastProgress = useRef(-1);
-
-  const seed = useMemo(
-    () => hashString(`${seedText}:${worldSeed}:reference-voxel`),
-    [seedText, worldSeed],
-  );
+  const seed = useMemo(() => hashString(`${seedText}:${worldSeed}:voxel`), [seedText, worldSeed]);
   const world = useMemo(() => generateVoxelWorld(matrix, seed), [matrix, seed]);
   const blocks = useMemo(() => groupByKind(world.blocks), [world.blocks]);
 
-  const lightMaterial = useMemo(createMaterial, []);
-  const blossomMaterial = useMemo(createMaterial, []);
-  const trunkMaterial = useMemo(createMaterial, []);
-  const grassMaterial = useMemo(createMaterial, []);
-  const quietMaterial = useMemo(
-    () =>
-      new THREE.MeshBasicMaterial({
-        color: '#ffffff',
-        transparent: true,
-        opacity: 0,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      }),
-    [],
+  const lightMaterial = useMemo(
+    () => new THREE.MeshStandardMaterial({
+      color: theme.lightTile,
+      emissive: '#ffffff',
+      emissiveIntensity: 0,
+      roughness: 0.93,
+      metalness: 0,
+    }),
+    [theme.lightTile],
+  );
+  const blossomMaterial = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: theme.blossom, roughness: 0.88, metalness: 0 }),
+    [theme.blossom],
+  );
+  const trunkMaterial = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: theme.trunk, roughness: 0.95, metalness: 0 }),
+    [theme.trunk],
+  );
+  const grassMaterial = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: theme.leaf, roughness: 0.94, metalness: 0 }),
+    [theme.leaf],
   );
 
   useLayoutEffect(() => {
-    [lightRef.current, blossomRef.current, trunkRef.current, grassRef.current].forEach(
-      (mesh) => {
-        if (mesh) mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      },
-    );
+    [lightRef.current, blossomRef.current, trunkRef.current, grassRef.current].forEach((mesh) => {
+      if (mesh) mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    });
+    writeBlocks(lightRef.current, blocks.light, progress.current);
+    writeBlocks(blossomRef.current, blocks.blossom, progress.current);
+    writeBlocks(trunkRef.current, blocks.trunk, progress.current);
+    writeBlocks(grassRef.current, blocks.grass, progress.current);
     lastProgress.current = -1;
-  }, [blocks]);
+  }, [blocks, progress]);
 
   useEffect(
     () => () => {
@@ -166,97 +105,48 @@ export function VoxelWorld({
       blossomMaterial.dispose();
       trunkMaterial.dispose();
       grassMaterial.dispose();
-      quietMaterial.dispose();
-    }, [
-      blossomMaterial,
-      grassMaterial,
-      lightMaterial,
-      quietMaterial,
-      trunkMaterial,
-    ],
+    }, [blossomMaterial, grassMaterial, lightMaterial, trunkMaterial],
   );
 
   useFrame(() => {
     const p = THREE.MathUtils.clamp(progress.current, 0, 1);
-
-    if (groupRef.current) {
-      groupRef.current.rotation.order = 'YXZ';
-      groupRef.current.rotation.y = THREE.MathUtils.lerp(ISO_ANGLE_Y, FLAT_ANGLE_Y, p);
-      groupRef.current.rotation.x = THREE.MathUtils.lerp(ISO_ANGLE_X, FLAT_ANGLE_X, p);
-      groupRef.current.rotation.z = 0;
-      groupRef.current.position.y = THREE.MathUtils.lerp(0, world.gridSize * 0.028, p);
-    }
-
-    quietMaterial.opacity = rangeProgress(p, 0.72, 0.98);
-
-    const scanLight = rangeProgress(p, 0.78, 1);
-    lightMaterial.emissive.set('#ffffff');
-    lightMaterial.emissiveIntensity = scanLight * 0.78;
-    blossomMaterial.emissive.set('#000000');
-    trunkMaterial.emissive.set('#000000');
-    grassMaterial.emissive.set('#000000');
-
-    if (Math.abs(lastProgress.current - p) < 0.0002) return;
+    if (Math.abs(p - lastProgress.current) < 0.0002) return;
     lastProgress.current = p;
 
-    writeBlocks(lightRef.current, blocks.light, theme, p);
-    writeBlocks(blossomRef.current, blocks.blossom, theme, p);
-    writeBlocks(trunkRef.current, blocks.trunk, theme, p);
-    writeBlocks(grassRef.current, blocks.grass, theme, p);
+    writeBlocks(lightRef.current, blocks.light, p);
+    writeBlocks(blossomRef.current, blocks.blossom, p);
+    writeBlocks(trunkRef.current, blocks.trunk, p);
+    writeBlocks(grassRef.current, blocks.grass, p);
+
+    const scanColorAmount = rangeProgress(p, 0.55, 0.98);
+    workingColor.set(theme.lightTile).lerp(WHITE, scanColorAmount);
+    lightMaterial.color.copy(workingColor);
+    lightMaterial.emissiveIntensity = scanColorAmount * 1.2;
+    if (lightRef.current) lightRef.current.receiveShadow = scanColorAmount < 0.72;
+
+    workingColor.set(theme.blossom).lerp(DARK, scanColorAmount);
+    blossomMaterial.color.copy(workingColor);
+    workingColor.set(theme.trunk).lerp(DARK, scanColorAmount);
+    trunkMaterial.color.copy(workingColor);
+    workingColor.set(theme.leaf).lerp(DARK, scanColorAmount);
+    grassMaterial.color.copy(workingColor);
   });
 
-  const quietSpan = world.gridSize + matrix.quietZone * 2;
-
   return (
-    <group ref={groupRef}>
-      <mesh
-        position={[0, -0.012, 0]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        material={quietMaterial}
-        renderOrder={-1}
-      >
-        <planeGeometry args={[quietSpan, quietSpan]} />
-      </mesh>
-
-      <instancedMesh
-        ref={lightRef}
-        args={[undefined, undefined, blocks.light.length]}
-        receiveShadow
-        frustumCulled={false}
-      >
+    <group>
+      <instancedMesh ref={lightRef} args={[undefined, undefined, blocks.light.length]} receiveShadow frustumCulled={false}>
         <boxGeometry args={[1, 1, 1]} />
         <primitive object={lightMaterial} attach="material" />
       </instancedMesh>
-
-      <instancedMesh
-        ref={blossomRef}
-        args={[undefined, undefined, blocks.blossom.length]}
-        castShadow
-        receiveShadow
-        frustumCulled={false}
-      >
+      <instancedMesh ref={blossomRef} args={[undefined, undefined, blocks.blossom.length]} castShadow receiveShadow frustumCulled={false}>
         <boxGeometry args={[1, 1, 1]} />
         <primitive object={blossomMaterial} attach="material" />
       </instancedMesh>
-
-      <instancedMesh
-        ref={trunkRef}
-        args={[undefined, undefined, blocks.trunk.length]}
-        castShadow
-        receiveShadow
-        frustumCulled={false}
-      >
+      <instancedMesh ref={trunkRef} args={[undefined, undefined, blocks.trunk.length]} castShadow receiveShadow frustumCulled={false}>
         <boxGeometry args={[1, 1, 1]} />
         <primitive object={trunkMaterial} attach="material" />
       </instancedMesh>
-
-      <instancedMesh
-        ref={grassRef}
-        args={[undefined, undefined, blocks.grass.length]}
-        castShadow
-        receiveShadow
-        frustumCulled={false}
-      >
+      <instancedMesh ref={grassRef} args={[undefined, undefined, blocks.grass.length]} castShadow receiveShadow frustumCulled={false}>
         <boxGeometry args={[1, 1, 1]} />
         <primitive object={grassMaterial} attach="material" />
       </instancedMesh>
