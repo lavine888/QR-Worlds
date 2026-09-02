@@ -51,7 +51,8 @@ export function generateVoxelWorld(matrix: QRMatrix, _seed: number): VoxelWorldD
     });
   };
 
-  // Pass 1: one ground cube per QR module.
+  // Pass 1: one ground cube per QR module. The footprint never changes, so
+  // the flat state remains the exact QR symbol even as the canopy is refined.
   for (let row = 0; row < gridSize; row += 1) {
     for (let col = 0; col < gridSize; col += 1) {
       const isDark = qr[row][col];
@@ -71,7 +72,7 @@ export function generateVoxelWorld(matrix: QRMatrix, _seed: number): VoxelWorldD
     }
   }
 
-  // Pass 2: compact 12-course trunk, exactly like the reference grammar.
+  // Pass 2: compact 12-course trunk, matching the reference grammar.
   for (let row = 0; row < gridSize; row += 1) {
     for (let col = 0; col < gridSize; col += 1) {
       if (!qr[row][col]) continue;
@@ -85,7 +86,10 @@ export function generateVoxelWorld(matrix: QRMatrix, _seed: number): VoxelWorldD
     }
   }
 
-  // Pass 3: QR-owned blossom dome with deterministic ragged top courses.
+  // Pass 3: QR-owned blossom canopy. The footprint stays identical to the QR,
+  // but its HEIGHT profile gets a tiny low-frequency lobe pattern plus a
+  // softened lower edge. This removes the mathematically perfect dome feeling
+  // without inventing branches or decorative geometry outside the code.
   for (let row = 0; row < gridSize; row += 1) {
     for (let col = 0; col < gridSize; col += 1) {
       if (!qr[row][col]) continue;
@@ -96,25 +100,30 @@ export function generateVoxelWorld(matrix: QRMatrix, _seed: number): VoxelWorldD
       if (dist >= canopyRadius) continue;
 
       const t = 1 - dist / canopyRadius;
-      const layersHere = Math.max(
-        3,
-        Math.round(MAX_CANOPY_LAYERS * (0.25 + 0.75 * t * t)),
-      );
+      const angle = Math.atan2(dy, dx);
+      const edgeWeight = 1 - Math.min(1, t * 1.7);
+      const lobe =
+        Math.sin(angle * 3 + 0.65) * 0.58 +
+        Math.sin(angle * 5 - 0.9) * 0.32;
+      const localJitter = (pseudoRandom(col, row, 913) - 0.5) * 0.9;
+      const silhouetteLift = Math.round((lobe * 0.72 + localJitter * 0.35) * edgeWeight);
+
+      const baseLayers = MAX_CANOPY_LAYERS * (0.25 + 0.75 * t * t);
+      const layersHere = Math.max(3, Math.round(baseLayers) + silhouetteLift);
       const domeOffset = Math.floor(t * 3);
+      const lowerDrop = t < 0.34 && pseudoRandom(col, row, 271) > 0.56 ? 1 : 0;
+      const startLayer = TRUNK_LAYERS - lowerDrop + domeOffset;
 
       for (let layer = 0; layer < layersHere; layer += 1) {
-        push('blossom', col, row, TRUNK_LAYERS + domeOffset + layer, 40);
+        push('blossom', col, row, startLayer + layer, 40);
       }
 
-      const extraCount = Math.floor(pseudoRandom(col, row, 500) * 4);
+      // Keep the reference's ragged top, but bias extras toward the middle and
+      // upper canopy so the lower silhouette stays lighter and less blocky.
+      const extraBudget = pseudoRandom(col, row, 500) * (2.3 + t * 1.4);
+      const extraCount = Math.floor(extraBudget);
       for (let extra = 0; extra < extraCount; extra += 1) {
-        push(
-          'blossom',
-          col,
-          row,
-          TRUNK_LAYERS + domeOffset + layersHere + extra,
-          70,
-        );
+        push('blossom', col, row, startLayer + layersHere + extra, 70);
       }
     }
   }
