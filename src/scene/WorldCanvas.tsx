@@ -16,7 +16,7 @@ type WorldCanvasProps = {
 export function WorldCanvas({ matrix, scanMode, onCanvasReady }: WorldCanvasProps) {
   return (
     <Canvas
-      dpr={[1, 1.5]}
+      dpr={[1.25, 1.85]}
       camera={{ position: [0, 0, 2], near: 0.1, far: 10 }}
       gl={{
         antialias: true,
