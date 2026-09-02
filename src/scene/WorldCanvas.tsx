@@ -29,7 +29,7 @@ export function WorldCanvas({
     <Canvas
       orthographic
       shadows
-      dpr={[1, 1.75]}
+      dpr={[1, 1.5]}
       camera={{
         position: [0, 0, -10],
         left: -1,
@@ -43,26 +43,30 @@ export function WorldCanvas({
       gl={{
         antialias: true,
         alpha: false,
-        preserveDrawingBuffer: true,
-        powerPreference: 'high-performance',
+        powerPreference: 'default',
       }}
+      fallback={<div className="webgl-fallback">WebGL is unavailable in this browser.</div>}
       onCreated={({ gl }) => {
-        gl.toneMapping = THREE.ACESFilmicToneMapping;
-        gl.toneMappingExposure = 1;
+        // Be explicit here instead of relying on renderer defaults. Some GPU /
+        // browser combinations were presenting the preview canvas as black even
+        // though the scene had mounted successfully.
+        gl.setClearColor('#f7f7f7', 1);
+        gl.outputColorSpace = THREE.SRGBColorSpace;
+        gl.toneMapping = THREE.NoToneMapping;
         gl.shadowMap.type = THREE.PCFSoftShadowMap;
         onCanvasReady?.(gl.domElement);
       }}
     >
       <color attach="background" args={['#f7f7f7']} />
-      <ambientLight intensity={1.22} />
-      <hemisphereLight args={['#eef3f4', '#7f8f72', 0.58]} />
+      <ambientLight intensity={1.35} />
+      <hemisphereLight args={['#ffffff', '#9aa792', 0.72]} />
       <directionalLight
-        color="#fff2de"
+        color="#fff7ed"
         position={[-3.6, 5.8, -4.2]}
-        intensity={1.95}
+        intensity={1.55}
         castShadow
-        shadow-mapSize-width={1536}
-        shadow-mapSize-height={1536}
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
         shadow-camera-left={-2}
         shadow-camera-right={2}
         shadow-camera-top={2}
@@ -71,14 +75,14 @@ export function WorldCanvas({
         shadow-camera-far={14}
         shadow-bias={-0.00008}
       />
-      <directionalLight color="#d9e6ef" position={[4, 3, 2]} intensity={0.32} />
+      <directionalLight color="#e7f0f7" position={[4, 3, 2]} intensity={0.42} />
 
       <Suspense fallback={null}>
         <VoxelWorld
           matrix={matrix}
+          theme={theme}
           seedText={seedText}
           worldSeed={worldSeed}
-          theme={theme}
           progress={progress}
         />
       </Suspense>
