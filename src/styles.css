@@ -33,38 +33,15 @@ input { font: inherit; }
   position: relative;
   width: 100%;
   height: 60vh;
-  min-height: 360px;
-  margin-top: 9vh;
+  min-height: 340px;
+  margin-top: 10vh;
   flex: 0 0 auto;
   cursor: pointer;
   outline: none;
 }
 
-.reference-canvas::after {
-  position: absolute;
-  left: 50%;
-  bottom: 2px;
-  transform: translateX(-50%);
-  color: rgb(38 38 38 / 36%);
-  font-size: 10px;
-  font-weight: 520;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  pointer-events: none;
-  transition: opacity 180ms ease, transform 180ms ease, color 180ms ease;
-}
-
-.reference-canvas[data-mode="world"]::after { content: "tap to reveal QR"; }
-.reference-canvas[data-mode="scan"]::after { content: "tap to return"; }
-
-.reference-canvas:hover::after,
-.reference-canvas:focus-visible::after {
-  color: rgb(28 28 28 / 58%);
-  transform: translate(-50%, -2px);
-}
-
 .reference-canvas:focus-visible {
-  outline: 2px solid rgb(74 124 78 / 28%);
+  outline: 2px solid rgb(74 124 78 / 24%);
   outline-offset: -8px;
 }
 
@@ -72,6 +49,7 @@ input { font: inherit; }
   display: block;
   width: 100% !important;
   height: 100% !important;
+  background: transparent;
 }
 
 .reference-input {
@@ -97,7 +75,6 @@ input { font: inherit; }
   font-weight: 400;
   letter-spacing: 0.2px;
   padding: 14px 18px;
-  transition: box-shadow 160ms ease, transform 160ms ease;
 }
 
 .reference-field input::placeholder { color: #999; }
@@ -129,31 +106,20 @@ input { font: inherit; }
 @media (max-width: 640px) {
   .reference-canvas {
     height: 60vh;
-    min-height: 330px;
-    margin-top: 7vh;
-  }
-
-  .reference-canvas::after {
-    bottom: -1px;
-    font-size: 9px;
-    color: rgb(38 38 38 / 31%);
+    min-height: 320px;
+    margin-top: 10vh;
   }
 
   .reference-input {
     padding: 16px 12px 8px;
   }
-
-  .reference-field input {
-    font-size: 16px;
-    padding: 14px 18px;
-  }
 }
 
 @media (max-height: 690px) {
   .reference-canvas {
-    height: 58vh;
-    min-height: 300px;
-    margin-top: 5vh;
+    height: 60vh;
+    min-height: 290px;
+    margin-top: 7vh;
   }
 }
 
