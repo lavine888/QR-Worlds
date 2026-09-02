@@ -1,5 +1,5 @@
 import { useFrame, useThree } from '@react-three/fiber';
-import { useEffect, useState, type MutableRefObject } from 'react';
+import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import * as THREE from 'three';
 
 type CameraRigProps = {
@@ -9,8 +9,13 @@ type CameraRigProps = {
 
 const LERP_SPEED = 4;
 
+function easeInOutCubic(t: number) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
 export function CameraRig({ target, progress }: CameraRigProps) {
   const { camera, size } = useThree();
+  const rawProgress = useRef(progress.current);
   const [reducedMotion, setReducedMotion] = useState(false);
 
   useEffect(() => {
@@ -44,13 +49,19 @@ export function CameraRig({ target, progress }: CameraRigProps) {
 
   useFrame((_, delta) => {
     if (reducedMotion) {
+      rawProgress.current = target;
       progress.current = target;
       return;
     }
 
-    const alpha = 1 - Math.exp(-LERP_SPEED * delta);
-    progress.current = THREE.MathUtils.lerp(progress.current, target, alpha);
-    if (Math.abs(progress.current - target) < 0.001) progress.current = target;
+    rawProgress.current +=
+      (target - rawProgress.current) * Math.min(1, LERP_SPEED * Math.min(delta, 0.05));
+
+    if (Math.abs(rawProgress.current - target) < 0.001) {
+      rawProgress.current = target;
+    }
+
+    progress.current = easeInOutCubic(rawProgress.current);
   });
 
   return null;
