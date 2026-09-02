@@ -4,7 +4,6 @@ import * as THREE from 'three';
 import type { QRMatrix } from '../qr/generateQR';
 import { CameraRig } from './CameraRig';
 import type { WorldTheme } from './themes';
-import { VoxelBee } from './VoxelBee';
 import { VoxelWorld } from './VoxelWorld';
 
 type WorldCanvasProps = {
@@ -13,7 +12,6 @@ type WorldCanvasProps = {
   seedText: string;
   worldSeed: number;
   scanMode: boolean;
-  surpriseTick?: number;
   onCanvasReady?: (canvas: HTMLCanvasElement) => void;
 };
 
@@ -23,7 +21,6 @@ export function WorldCanvas({
   seedText,
   worldSeed,
   scanMode,
-  surpriseTick = 0,
   onCanvasReady,
 }: WorldCanvasProps) {
   const progress = useRef(scanMode ? 1 : 0);
@@ -32,40 +29,43 @@ export function WorldCanvas({
     <Canvas
       orthographic
       shadows
-      dpr={[1, 1.75]}
-      camera={{ position: [24, 22, 28], zoom: 22, near: 0.1, far: 1000 }}
-      gl={{
-        antialias: true,
-        alpha: false,
-        preserveDrawingBuffer: true,
-        powerPreference: 'high-performance',
+      dpr={[1, 1.5]}
+      camera={{
+        position: [0, 0, 3],
+        left: -1,
+        right: 1,
+        top: 1,
+        bottom: -1,
+        near: 0.1,
+        far: 10,
       }}
+      gl={{ antialias: true, alpha: true, powerPreference: 'default' }}
       onCreated={({ gl }) => {
+        gl.setClearColor('#f7f7f7', 0);
         gl.toneMapping = THREE.ACESFilmicToneMapping;
-        gl.toneMappingExposure = 1.03;
+        gl.toneMappingExposure = 1;
         gl.shadowMap.type = THREE.PCFSoftShadowMap;
         onCanvasReady?.(gl.domElement);
       }}
     >
-      <color attach="background" args={['#f7f7f7']} />
-      <ambientLight intensity={1.15} />
-      <hemisphereLight args={['#ffffff', '#b5b1a8', 0.72]} />
+      <ambientLight intensity={1.05} />
+      <hemisphereLight args={['#d1e0eb', '#80966b', 0.58]} />
       <directionalLight
-        color="#fff5e7"
-        position={[-10, 18, 12]}
-        intensity={2.1}
+        color="#fff1df"
+        position={[-3.8, 5.8, 4.5]}
+        intensity={2.05}
         castShadow
-        shadow-mapSize-width={1536}
-        shadow-mapSize-height={1536}
-        shadow-camera-left={-28}
-        shadow-camera-right={28}
-        shadow-camera-top={28}
-        shadow-camera-bottom={-28}
-        shadow-camera-near={0.5}
-        shadow-camera-far={70}
-        shadow-bias={-0.00022}
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
+        shadow-camera-left={-1.2}
+        shadow-camera-right={1.2}
+        shadow-camera-top={1.2}
+        shadow-camera-bottom={-1.2}
+        shadow-camera-near={1}
+        shadow-camera-far={8}
+        shadow-bias={-0.00015}
       />
-      <directionalLight color="#dbe5ea" position={[10, 8, -12]} intensity={0.48} />
+      <directionalLight color="#d9e7f0" position={[4, 3, 2]} intensity={0.34} />
 
       <Suspense fallback={null}>
         <VoxelWorld
@@ -75,10 +75,9 @@ export function WorldCanvas({
           theme={theme}
           progress={progress}
         />
-        <VoxelBee trigger={surpriseTick} worldSize={matrix.size} />
       </Suspense>
 
-      <CameraRig target={scanMode ? 1 : 0} progress={progress} matrixSize={matrix.size} />
+      <CameraRig target={scanMode ? 1 : 0} progress={progress} />
     </Canvas>
   );
 }
