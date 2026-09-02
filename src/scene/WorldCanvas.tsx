@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import type { QRMatrix } from '../qr/generateQR';
 import { CameraRig } from './CameraRig';
 import type { WorldTheme } from './themes';
+import { VoxelBee } from './VoxelBee';
 import { VoxelWorld } from './VoxelWorld';
 
 type WorldCanvasProps = {
@@ -12,6 +13,7 @@ type WorldCanvasProps = {
   seedText: string;
   worldSeed: number;
   scanMode: boolean;
+  surpriseTick?: number;
   onCanvasReady?: (canvas: HTMLCanvasElement) => void;
 };
 
@@ -21,6 +23,7 @@ export function WorldCanvas({
   seedText,
   worldSeed,
   scanMode,
+  surpriseTick = 0,
   onCanvasReady,
 }: WorldCanvasProps) {
   const progress = useRef(scanMode ? 1 : 0);
@@ -29,65 +32,53 @@ export function WorldCanvas({
     <Canvas
       orthographic
       shadows
-      dpr={[1, 1.5]}
-      camera={{
-        position: [0, 0, -10],
-        left: -1,
-        right: 1,
-        top: 1,
-        bottom: -1,
-        zoom: 1,
-        near: 0.1,
-        far: 100,
-      }}
+      dpr={[1, 1.75]}
+      camera={{ position: [24, 22, 28], zoom: 22, near: 0.1, far: 1000 }}
       gl={{
         antialias: true,
         alpha: false,
-        powerPreference: 'default',
+        preserveDrawingBuffer: true,
+        powerPreference: 'high-performance',
       }}
-      fallback={<div className="webgl-fallback">WebGL is unavailable in this browser.</div>}
       onCreated={({ gl }) => {
-        // Be explicit here instead of relying on renderer defaults. Some GPU /
-        // browser combinations were presenting the preview canvas as black even
-        // though the scene had mounted successfully.
-        gl.setClearColor('#f7f7f7', 1);
-        gl.outputColorSpace = THREE.SRGBColorSpace;
-        gl.toneMapping = THREE.NoToneMapping;
+        gl.toneMapping = THREE.ACESFilmicToneMapping;
+        gl.toneMappingExposure = 1.03;
         gl.shadowMap.type = THREE.PCFSoftShadowMap;
         onCanvasReady?.(gl.domElement);
       }}
     >
       <color attach="background" args={['#f7f7f7']} />
-      <ambientLight intensity={1.35} />
-      <hemisphereLight args={['#ffffff', '#9aa792', 0.72]} />
+      <ambientLight intensity={1.15} />
+      <hemisphereLight args={['#ffffff', '#b5b1a8', 0.72]} />
       <directionalLight
-        color="#fff7ed"
-        position={[-3.6, 5.8, -4.2]}
-        intensity={1.55}
+        color="#fff5e7"
+        position={[-10, 18, 12]}
+        intensity={2.1}
         castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
-        shadow-camera-left={-2}
-        shadow-camera-right={2}
-        shadow-camera-top={2}
-        shadow-camera-bottom={-2}
-        shadow-camera-near={0.1}
-        shadow-camera-far={14}
-        shadow-bias={-0.00008}
+        shadow-mapSize-width={1536}
+        shadow-mapSize-height={1536}
+        shadow-camera-left={-28}
+        shadow-camera-right={28}
+        shadow-camera-top={28}
+        shadow-camera-bottom={-28}
+        shadow-camera-near={0.5}
+        shadow-camera-far={70}
+        shadow-bias={-0.00022}
       />
-      <directionalLight color="#e7f0f7" position={[4, 3, 2]} intensity={0.42} />
+      <directionalLight color="#dbe5ea" position={[10, 8, -12]} intensity={0.48} />
 
       <Suspense fallback={null}>
         <VoxelWorld
           matrix={matrix}
-          theme={theme}
           seedText={seedText}
           worldSeed={worldSeed}
+          theme={theme}
           progress={progress}
         />
+        <VoxelBee trigger={surpriseTick} worldSize={matrix.size} />
       </Suspense>
 
-      <CameraRig target={scanMode ? 1 : 0} progress={progress} />
+      <CameraRig target={scanMode ? 1 : 0} progress={progress} matrixSize={matrix.size} />
     </Canvas>
   );
 }
