@@ -20,12 +20,12 @@ export function WorldCanvas({ matrix, scanMode, onCanvasReady }: WorldCanvasProp
       camera={{ position: [0, 0, 2], near: 0.1, far: 10 }}
       gl={{
         antialias: true,
-        alpha: true,
+        alpha: false,
         powerPreference: 'default',
         preserveDrawingBuffer: true,
       }}
       onCreated={({ gl }) => {
-        gl.setClearColor('#f7f7f7', 0);
+        gl.setClearColor('#f7f7f7', 1);
         gl.toneMapping = THREE.NoToneMapping;
         gl.outputColorSpace = THREE.SRGBColorSpace;
         onCanvasReady?.(gl.domElement);
