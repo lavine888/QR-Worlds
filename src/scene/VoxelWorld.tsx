@@ -1,11 +1,5 @@
 import { useFrame } from '@react-three/fiber';
-import {
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  type MutableRefObject,
-} from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, type MutableRefObject } from 'react';
 import * as THREE from 'three';
 import { hashString } from '../procedural/hash';
 import {
@@ -24,289 +18,137 @@ type VoxelWorldProps = {
   progress: MutableRefObject<number>;
 };
 
-const BLOCK_SIZE = 0.0245;
-const ISO_ANGLE_Y = 0.78;
-const ISO_ANGLE_X = -0.55;
-const FLAT_ANGLE_Y = 0;
-const FLAT_ANGLE_X = -Math.PI / 2;
-const VIEW_SCALE_3D = 1.58;
-const VIEW_SCALE_2D = 2.1;
-
 const dummy = new THREE.Object3D();
-const rotY = new THREE.Matrix4();
-const rotX = new THREE.Matrix4();
-const rotationMatrix = new THREE.Matrix4();
-const WHITE = new THREE.Color(1, 1, 1);
-const BLACK = new THREE.Color(0.018, 0.018, 0.018);
+const WHITE = new THREE.Color('#ffffff');
+const DARK = new THREE.Color('#111111');
 const workingColor = new THREE.Color();
 
-function smooth(value: number) {
-  return THREE.MathUtils.smootherstep(THREE.MathUtils.clamp(value, 0, 1), 0, 1);
+function rangeProgress(value: number, start: number, end: number) {
+  const local = THREE.MathUtils.clamp((value - start) / Math.max(0.001, end - start), 0, 1);
+  return THREE.MathUtils.smootherstep(local, 0, 1);
 }
 
 function groupByKind(blocks: VoxelBlock[]) {
   const grouped: Record<VoxelKind, VoxelBlock[]> = {
-    dirt: [],
+    light: [],
     blossom: [],
     trunk: [],
-    branch: [],
     grass: [],
-    fallen: [],
-    petal: [],
   };
   blocks.forEach((block) => grouped[block.kind].push(block));
   return grouped;
 }
 
-function mix3(
-  a: readonly [number, number, number],
-  b: readonly [number, number, number],
-  t: number,
-) {
-  return workingColor.setRGB(
-    THREE.MathUtils.lerp(a[0], b[0], t),
-    THREE.MathUtils.lerp(a[1], b[1], t),
-    THREE.MathUtils.lerp(a[2], b[2], t),
-  );
-}
-
-const palette = {
-  dirtLight: [1.0, 0.985, 0.955] as const,
-  dirtDark: [0.89, 0.84, 0.76] as const,
-  sakuraLight: [0.96, 0.48, 0.62] as const,
-  sakuraDeep: [0.54, 0.12, 0.28] as const,
-  petalLight: [1.0, 0.67, 0.76] as const,
-  petalDeep: [0.66, 0.17, 0.36] as const,
-  barkLight: [0.46, 0.25, 0.11] as const,
-  barkDeep: [0.20, 0.075, 0.035] as const,
-  branchLight: [0.52, 0.29, 0.13] as const,
-  branchDeep: [0.24, 0.09, 0.04] as const,
-  grassLight: [0.23, 0.48, 0.14] as const,
-  grassDark: [0.08, 0.24, 0.055] as const,
-  fallenLight: [0.64, 0.52, 0.39] as const,
-  fallenDark: [0.34, 0.42, 0.24] as const,
-};
-
-function referenceColor(kind: VoxelKind, tone: number, scanAmount: number) {
-  let color: THREE.Color;
-  switch (kind) {
-    case 'dirt':
-      color = mix3(palette.dirtLight, palette.dirtDark, tone * 0.72);
-      color.lerp(WHITE, scanAmount);
-      break;
-    case 'blossom':
-      color = mix3(palette.sakuraLight, palette.sakuraDeep, tone * 0.86);
-      color.lerp(BLACK, scanAmount);
-      break;
-    case 'petal':
-      color = mix3(palette.petalLight, palette.petalDeep, tone * 0.82);
-      break;
-    case 'trunk':
-      color = mix3(palette.barkLight, palette.barkDeep, tone * 0.88);
-      color.lerp(BLACK, scanAmount);
-      break;
-    case 'branch':
-      color = mix3(palette.branchLight, palette.branchDeep, tone * 0.88);
-      break;
-    case 'grass':
-      color = mix3(palette.grassLight, palette.grassDark, tone * 0.86);
-      color.lerp(BLACK, scanAmount);
-      break;
-    case 'fallen':
-      color = mix3(palette.fallenLight, palette.fallenDark, tone * 0.78);
-      color.lerp(BLACK, scanAmount);
-      break;
-  }
-  return color;
-}
-
-function writeInstances(
-  mesh: THREE.InstancedMesh | null,
-  items: VoxelBlock[],
-  kind: VoxelKind,
-  scanAmount: number,
-  visibilityScale = 1,
-) {
+function writeBlocks(mesh: THREE.InstancedMesh | null, items: VoxelBlock[], progress: number) {
   if (!mesh) return;
-
-  const scale = Math.max(0.001, visibilityScale);
-  mesh.visible = scale > 0.004;
-  if (!mesh.visible) return;
+  const fill = THREE.MathUtils.lerp(0.92, 1, rangeProgress(progress, 0.34, 0.9));
+  const height = THREE.MathUtils.lerp(0.94, 0.995, rangeProgress(progress, 0.46, 0.96));
 
   items.forEach((item, index) => {
     dummy.position.set(item.x, item.y + 0.5, item.z);
+    const gardenJitter = 1 + (item.tone - 0.5) * 0.035 * (1 - progress);
+    dummy.scale.set(fill * gardenJitter, height, fill * gardenJitter);
     dummy.rotation.set(0, 0, 0);
-    dummy.scale.setScalar(scale);
     dummy.updateMatrix();
     mesh.setMatrixAt(index, dummy.matrix);
-    mesh.setColorAt(index, referenceColor(kind, item.tone, scanAmount));
   });
-
   mesh.instanceMatrix.needsUpdate = true;
-  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
 }
 
-function makeMaterial() {
-  // Lambert keeps the voxel faces visibly shaded while avoiding the much
-  // darker ACES/standard-material path that produced black previews on some
-  // browser/GPU combinations.
-  return new THREE.MeshLambertMaterial({
-    color: '#ffffff',
-    vertexColors: true,
-  });
-}
-
-export function VoxelWorld({ matrix, seedText, worldSeed, progress }: VoxelWorldProps) {
-  const rootRef = useRef<THREE.Group>(null);
-  const quietZoneRef = useRef<THREE.Mesh>(null);
-  const dirtRef = useRef<THREE.InstancedMesh>(null);
+export function VoxelWorld({ matrix, seedText, worldSeed, theme, progress }: VoxelWorldProps) {
+  const lightRef = useRef<THREE.InstancedMesh>(null);
   const blossomRef = useRef<THREE.InstancedMesh>(null);
   const trunkRef = useRef<THREE.InstancedMesh>(null);
-  const branchRef = useRef<THREE.InstancedMesh>(null);
   const grassRef = useRef<THREE.InstancedMesh>(null);
-  const fallenRef = useRef<THREE.InstancedMesh>(null);
-  const petalRef = useRef<THREE.InstancedMesh>(null);
   const lastProgress = useRef(-1);
-  const seed = useMemo(() => hashString(`${seedText}:${worldSeed}:reference`), [seedText, worldSeed]);
+  const seed = useMemo(() => hashString(`${seedText}:${worldSeed}:voxel`), [seedText, worldSeed]);
   const world = useMemo(() => generateVoxelWorld(matrix, seed), [matrix, seed]);
   const blocks = useMemo(() => groupByKind(world.blocks), [world.blocks]);
 
-  const materials = useMemo(
-    () => ({
-      dirt: makeMaterial(),
-      blossom: makeMaterial(),
-      trunk: makeMaterial(),
-      branch: makeMaterial(),
-      grass: makeMaterial(),
-      fallen: makeMaterial(),
-      petal: makeMaterial(),
+  const lightMaterial = useMemo(
+    () => new THREE.MeshStandardMaterial({
+      color: theme.lightTile,
+      emissive: '#ffffff',
+      emissiveIntensity: 0,
+      roughness: 0.93,
+      metalness: 0,
     }),
-    [],
+    [theme.lightTile],
   );
-  const quietZoneMaterial = useMemo(
-    () => new THREE.MeshBasicMaterial({
-      color: '#ffffff',
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-      toneMapped: false,
-    }),
-    [],
+  const blossomMaterial = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: theme.blossom, roughness: 0.88, metalness: 0 }),
+    [theme.blossom],
+  );
+  const trunkMaterial = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: theme.trunk, roughness: 0.95, metalness: 0 }),
+    [theme.trunk],
+  );
+  const grassMaterial = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: theme.leaf, roughness: 0.94, metalness: 0 }),
+    [theme.leaf],
   );
 
   useLayoutEffect(() => {
-    const meshes = [
-      dirtRef.current,
-      blossomRef.current,
-      trunkRef.current,
-      branchRef.current,
-      grassRef.current,
-      fallenRef.current,
-      petalRef.current,
-    ];
-    meshes.forEach((mesh) => {
+    [lightRef.current, blossomRef.current, trunkRef.current, grassRef.current].forEach((mesh) => {
       if (mesh) mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     });
-
-    writeInstances(dirtRef.current, blocks.dirt, 'dirt', 0);
-    writeInstances(blossomRef.current, blocks.blossom, 'blossom', 0);
-    writeInstances(trunkRef.current, blocks.trunk, 'trunk', 0);
-    writeInstances(branchRef.current, blocks.branch, 'branch', 0);
-    writeInstances(grassRef.current, blocks.grass, 'grass', 0);
-    writeInstances(fallenRef.current, blocks.fallen, 'fallen', 0);
-    writeInstances(petalRef.current, blocks.petal, 'petal', 0);
+    writeBlocks(lightRef.current, blocks.light, progress.current);
+    writeBlocks(blossomRef.current, blocks.blossom, progress.current);
+    writeBlocks(trunkRef.current, blocks.trunk, progress.current);
+    writeBlocks(grassRef.current, blocks.grass, progress.current);
     lastProgress.current = -1;
-  }, [blocks]);
+  }, [blocks, progress]);
 
   useEffect(
     () => () => {
-      Object.values(materials).forEach((material) => material.dispose());
-      quietZoneMaterial.dispose();
-    }, [materials, quietZoneMaterial],
+      lightMaterial.dispose();
+      blossomMaterial.dispose();
+      trunkMaterial.dispose();
+      grassMaterial.dispose();
+    }, [blossomMaterial, grassMaterial, lightMaterial, trunkMaterial],
   );
 
   useFrame(() => {
-    const raw = THREE.MathUtils.clamp(progress.current, 0, 1);
-    const p = smooth(raw);
-    if (Math.abs(lastProgress.current - p) < 0.0002) return;
+    const p = THREE.MathUtils.clamp(progress.current, 0, 1);
+    if (Math.abs(p - lastProgress.current) < 0.0002) return;
     lastProgress.current = p;
 
-    const angleY = THREE.MathUtils.lerp(ISO_ANGLE_Y, FLAT_ANGLE_Y, p);
-    const angleX = THREE.MathUtils.lerp(ISO_ANGLE_X, FLAT_ANGLE_X, p);
-    const viewScale = THREE.MathUtils.lerp(VIEW_SCALE_3D, VIEW_SCALE_2D, p);
+    writeBlocks(lightRef.current, blocks.light, p);
+    writeBlocks(blossomRef.current, blocks.blossom, p);
+    writeBlocks(trunkRef.current, blocks.trunk, p);
+    writeBlocks(grassRef.current, blocks.grass, p);
 
-    if (rootRef.current) {
-      rotY.makeRotationY(-angleY);
-      rotX.makeRotationX(angleX);
-      rotationMatrix.multiplyMatrices(rotX, rotY);
-      rootRef.current.quaternion.setFromRotationMatrix(rotationMatrix);
-      rootRef.current.scale.setScalar(BLOCK_SIZE * viewScale);
-      rootRef.current.position.set(
-        THREE.MathUtils.lerp(-0.02, 0.015, p),
-        THREE.MathUtils.lerp(-0.015, 0.08, p),
-        0,
-      );
-    }
+    const scanColorAmount = rangeProgress(p, 0.55, 0.98);
+    workingColor.set(theme.lightTile).lerp(WHITE, scanColorAmount);
+    lightMaterial.color.copy(workingColor);
+    lightMaterial.emissiveIntensity = scanColorAmount * 1.2;
+    if (lightRef.current) lightRef.current.receiveShadow = scanColorAmount < 0.72;
 
-    const decorativeScale = 1 - smooth((p - 0.18) / 0.38);
-    const scanAmount = smooth((p - 0.58) / 0.42);
-    const quietAmount = smooth((p - 0.46) / 0.34);
-
-    writeInstances(dirtRef.current, blocks.dirt, 'dirt', scanAmount);
-    writeInstances(blossomRef.current, blocks.blossom, 'blossom', scanAmount);
-    writeInstances(trunkRef.current, blocks.trunk, 'trunk', scanAmount);
-    writeInstances(branchRef.current, blocks.branch, 'branch', 0, decorativeScale);
-    writeInstances(grassRef.current, blocks.grass, 'grass', scanAmount);
-    writeInstances(fallenRef.current, blocks.fallen, 'fallen', scanAmount);
-    writeInstances(petalRef.current, blocks.petal, 'petal', 0, decorativeScale);
-
-    if (quietZoneRef.current) {
-      quietZoneRef.current.visible = quietAmount > 0.01;
-      quietZoneRef.current.scale.set(
-        Math.max(0.001, quietAmount),
-        1,
-        Math.max(0.001, quietAmount),
-      );
-      quietZoneMaterial.opacity = quietAmount;
-    }
+    workingColor.set(theme.blossom).lerp(DARK, scanColorAmount);
+    blossomMaterial.color.copy(workingColor);
+    workingColor.set(theme.trunk).lerp(DARK, scanColorAmount);
+    trunkMaterial.color.copy(workingColor);
+    workingColor.set(theme.leaf).lerp(DARK, scanColorAmount);
+    grassMaterial.color.copy(workingColor);
   });
 
-  const scanPlateSize = world.gridSize + matrix.quietZone * 2;
-
   return (
-    <group ref={rootRef}>
-      <mesh ref={quietZoneRef} position={[0, -0.08, 0]} visible={false} renderOrder={-1}>
-        <boxGeometry args={[scanPlateSize, 0.08, scanPlateSize]} />
-        <primitive object={quietZoneMaterial} attach="material" />
-      </mesh>
-
-      <instancedMesh ref={dirtRef} args={[undefined, undefined, blocks.dirt.length]} receiveShadow frustumCulled={false}>
+    <group>
+      <instancedMesh ref={lightRef} args={[undefined, undefined, blocks.light.length]} receiveShadow frustumCulled={false}>
         <boxGeometry args={[1, 1, 1]} />
-        <primitive object={materials.dirt} attach="material" />
-      </instancedMesh>
-      <instancedMesh ref={fallenRef} args={[undefined, undefined, blocks.fallen.length]} receiveShadow frustumCulled={false}>
-        <boxGeometry args={[1, 1, 1]} />
-        <primitive object={materials.fallen} attach="material" />
-      </instancedMesh>
-      <instancedMesh ref={grassRef} args={[undefined, undefined, blocks.grass.length]} receiveShadow frustumCulled={false}>
-        <boxGeometry args={[1, 1, 1]} />
-        <primitive object={materials.grass} attach="material" />
-      </instancedMesh>
-      <instancedMesh ref={trunkRef} args={[undefined, undefined, blocks.trunk.length]} castShadow receiveShadow frustumCulled={false}>
-        <boxGeometry args={[1, 1, 1]} />
-        <primitive object={materials.trunk} attach="material" />
-      </instancedMesh>
-      <instancedMesh ref={branchRef} args={[undefined, undefined, blocks.branch.length]} castShadow receiveShadow frustumCulled={false}>
-        <boxGeometry args={[1, 1, 1]} />
-        <primitive object={materials.branch} attach="material" />
+        <primitive object={lightMaterial} attach="material" />
       </instancedMesh>
       <instancedMesh ref={blossomRef} args={[undefined, undefined, blocks.blossom.length]} castShadow receiveShadow frustumCulled={false}>
         <boxGeometry args={[1, 1, 1]} />
-        <primitive object={materials.blossom} attach="material" />
+        <primitive object={blossomMaterial} attach="material" />
       </instancedMesh>
-      <instancedMesh ref={petalRef} args={[undefined, undefined, blocks.petal.length]} castShadow receiveShadow frustumCulled={false}>
+      <instancedMesh ref={trunkRef} args={[undefined, undefined, blocks.trunk.length]} castShadow receiveShadow frustumCulled={false}>
         <boxGeometry args={[1, 1, 1]} />
-        <primitive object={materials.petal} attach="material" />
+        <primitive object={trunkMaterial} attach="material" />
+      </instancedMesh>
+      <instancedMesh ref={grassRef} args={[undefined, undefined, blocks.grass.length]} castShadow receiveShadow frustumCulled={false}>
+        <boxGeometry args={[1, 1, 1]} />
+        <primitive object={grassMaterial} attach="material" />
       </instancedMesh>
     </group>
   );
