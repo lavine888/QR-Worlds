@@ -17,7 +17,7 @@ export type VoxelWorldData = {
   canopyRadius: number;
 };
 
-const TRUNK_RADIUS = 2.5;
+const TRUNK_RADIUS = 2.8;
 const TRUNK_LAYERS = 12;
 const MAX_CANOPY_LAYERS = 12;
 const CANOPY_OUTER_RADIUS_FACTOR = 0.46;
@@ -52,7 +52,7 @@ export function generateVoxelWorld(matrix: QRMatrix, _seed: number): VoxelWorldD
   };
 
   // Pass 1: one ground cube per QR module. The footprint never changes, so
-  // the flat state remains the exact QR symbol even as the canopy is refined.
+  // the flat state remains the exact QR symbol even as the canopy is sculpted.
   for (let row = 0; row < gridSize; row += 1) {
     for (let col = 0; col < gridSize; col += 1) {
       const isDark = qr[row][col];
@@ -72,7 +72,8 @@ export function generateVoxelWorld(matrix: QRMatrix, _seed: number): VoxelWorldD
     }
   }
 
-  // Pass 2: compact 12-course trunk, matching the reference grammar.
+  // Pass 2: slightly broader compact trunk. It still occupies only QR-dark
+  // cells, so the flat symbol is untouched while the tree reads more clearly.
   for (let row = 0; row < gridSize; row += 1) {
     for (let col = 0; col < gridSize; col += 1) {
       if (!qr[row][col]) continue;
@@ -86,10 +87,9 @@ export function generateVoxelWorld(matrix: QRMatrix, _seed: number): VoxelWorldD
     }
   }
 
-  // Pass 3: QR-owned blossom canopy. The footprint stays identical to the QR,
-  // but its HEIGHT profile gets a tiny low-frequency lobe pattern plus a
-  // softened lower edge. This removes the mathematically perfect dome feeling
-  // without inventing branches or decorative geometry outside the code.
+  // Pass 3: same QR-owned canopy footprint, but a much more visible vertical
+  // silhouette. Three broad crown lobes plus five smaller ones create distinct
+  // high/low masses, while an undercut around the centre exposes the trunk.
   for (let row = 0; row < gridSize; row += 1) {
     for (let col = 0; col < gridSize; col += 1) {
       if (!qr[row][col]) continue;
@@ -101,26 +101,39 @@ export function generateVoxelWorld(matrix: QRMatrix, _seed: number): VoxelWorldD
 
       const t = 1 - dist / canopyRadius;
       const angle = Math.atan2(dy, dx);
-      const edgeWeight = 1 - Math.min(1, t * 1.7);
-      const lobe =
-        Math.sin(angle * 3 + 0.65) * 0.58 +
-        Math.sin(angle * 5 - 0.9) * 0.32;
-      const localJitter = (pseudoRandom(col, row, 913) - 0.5) * 0.9;
-      const silhouetteLift = Math.round((lobe * 0.72 + localJitter * 0.35) * edgeWeight);
+      const edgeWeight = 1 - Math.min(1, t * 1.45);
+      const crownLobes =
+        Math.sin(angle * 3 + 0.55) * 1.55 +
+        Math.sin(angle * 5 - 0.85) * 0.72;
+      const localJitter = (pseudoRandom(col, row, 913) - 0.5) * 1.8;
+      const silhouetteLift = Math.round(
+        crownLobes * (0.52 + edgeWeight * 0.72) + localJitter * 0.55,
+      );
 
-      const baseLayers = MAX_CANOPY_LAYERS * (0.25 + 0.75 * t * t);
-      const layersHere = Math.max(3, Math.round(baseLayers) + silhouetteLift);
-      const domeOffset = Math.floor(t * 3);
-      const lowerDrop = t < 0.34 && pseudoRandom(col, row, 271) > 0.56 ? 1 : 0;
-      const startLayer = TRUNK_LAYERS - lowerDrop + domeOffset;
+      // Fuller centre, visibly thinner outer edge.
+      const baseLayers = MAX_CANOPY_LAYERS * (0.18 + 0.82 * Math.pow(t, 1.7));
+      const layersHere = Math.max(2, Math.round(baseLayers) + silhouetteLift);
+      const domeOffset = Math.floor(t * 3.4);
+
+      // Lift the underside around the trunk by 2–3 courses. This is the main
+      // readability change: the crown now visibly hangs above a trunk instead
+      // of swallowing it into one solid pink mass.
+      let undercut = 0;
+      if (dist < 3.8) undercut = 3;
+      else if (dist < 5.4) undercut = 2;
+      else if (dist < 6.8 && pseudoRandom(col, row, 271) > 0.46) undercut = 1;
+
+      // A slight directional opening keeps the lower silhouette asymmetric.
+      const frontOpening = dy > 0 && Math.abs(dx) < canopyRadius * 0.28 && t > 0.42 ? 1 : 0;
+      const startLayer = TRUNK_LAYERS + domeOffset + undercut + frontOpening;
 
       for (let layer = 0; layer < layersHere; layer += 1) {
         push('blossom', col, row, startLayer + layer, 40);
       }
 
-      // Keep the reference's ragged top, but bias extras toward the middle and
-      // upper canopy so the lower silhouette stays lighter and less blocky.
-      const extraBudget = pseudoRandom(col, row, 500) * (2.3 + t * 1.4);
+      // Ragged upper courses are now concentrated in the crown core. The edge
+      // stays thin, which makes the lobe silhouette easier to read at a glance.
+      const extraBudget = pseudoRandom(col, row, 500) * (1.1 + t * 2.9);
       const extraCount = Math.floor(extraBudget);
       for (let extra = 0; extra < extraCount; extra += 1) {
         push('blossom', col, row, startLayer + layersHere + extra, 70);
