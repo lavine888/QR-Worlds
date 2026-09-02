@@ -26,6 +26,8 @@ const VIEW_SCALE_3D = 1.6;
 const VIEW_SCALE_2D = 2.1;
 const X_OFFSET_2D = 0.015;
 const Y_OFFSET_2D = 0.08;
+const SHADOW_HEIGHT_SCENE = 0.48;
+const SHADOW_OFFSET_SCENE = SHADOW_HEIGHT_SCENE * 0.35 * 0.5;
 
 const dummy = new THREE.Object3D();
 const rotY = new THREE.Matrix4();
@@ -110,6 +112,32 @@ function makeMaterial() {
   return new THREE.MeshLambertMaterial({ color: '#ffffff', vertexColors: true });
 }
 
+function makeShadowMaterial() {
+  return new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    toneMapped: false,
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      varying vec2 vUv;
+      void main() {
+        vec2 centered = vUv * 2.0 - 1.0;
+        float dist = length(centered);
+        float falloff = exp(-dist * dist * 2.5);
+        float alpha = 0.08 * falloff;
+        vec3 shadowColor = vec3(0.10, 0.12, 0.15);
+        gl_FragColor = vec4(shadowColor, alpha);
+      }
+    `,
+  });
+}
+
 function writeInstances(mesh: THREE.InstancedMesh | null, items: VoxelBlock[]) {
   if (!mesh) return;
   items.forEach((item, index) => {
@@ -124,7 +152,11 @@ function writeInstances(mesh: THREE.InstancedMesh | null, items: VoxelBlock[]) {
   if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
 }
 
-function applyReferenceTransform(group: THREE.Group | null, progress: number) {
+function applyReferenceTransform(
+  group: THREE.Group | null,
+  shadow: THREE.Mesh | null,
+  progress: number,
+) {
   if (!group) return;
   const p = THREE.MathUtils.clamp(progress, 0, 1);
   const angleY = THREE.MathUtils.lerp(ISO_ANGLE_Y, FLAT_ANGLE_Y, p);
@@ -141,6 +173,15 @@ function applyReferenceTransform(group: THREE.Group | null, progress: number) {
     THREE.MathUtils.lerp(0, Y_OFFSET_2D, p),
     0,
   );
+
+  if (shadow) {
+    const offsetBlocks = (SHADOW_OFFSET_SCENE / BLOCK_SIZE) * (1 - p);
+    shadow.position.set(
+      offsetBlocks,
+      -SHADOW_HEIGHT_SCENE / BLOCK_SIZE,
+      offsetBlocks,
+    );
+  }
 }
 
 export function VoxelWorld({
@@ -151,6 +192,7 @@ export function VoxelWorld({
   progress,
 }: WorldProps) {
   const rootRef = useRef<THREE.Group>(null);
+  const shadowRef = useRef<THREE.Mesh>(null);
   const dirtRef = useRef<THREE.InstancedMesh>(null);
   const blossomRef = useRef<THREE.InstancedMesh>(null);
   const trunkRef = useRef<THREE.InstancedMesh>(null);
@@ -170,6 +212,7 @@ export function VoxelWorld({
     }),
     [],
   );
+  const shadowMaterial = useMemo(makeShadowMaterial, []);
 
   useLayoutEffect(() => {
     writeInstances(dirtRef.current, blocks.dirt);
@@ -177,24 +220,36 @@ export function VoxelWorld({
     writeInstances(trunkRef.current, blocks.trunk);
     writeInstances(grassRef.current, blocks.grass);
     writeInstances(fallenRef.current, blocks.fallen);
-    applyReferenceTransform(rootRef.current, progress.current);
+    applyReferenceTransform(rootRef.current, shadowRef.current, progress.current);
     lastProgress.current = progress.current;
   }, [blocks, progress]);
 
   useEffect(
-    () => () => Object.values(materials).forEach((material) => material.dispose()),
-    [materials],
+    () => () => {
+      Object.values(materials).forEach((material) => material.dispose());
+      shadowMaterial.dispose();
+    },
+    [materials, shadowMaterial],
   );
 
   useFrame(() => {
     const p = progress.current;
     if (Math.abs(lastProgress.current - p) < 0.0001) return;
     lastProgress.current = p;
-    applyReferenceTransform(rootRef.current, p);
+    applyReferenceTransform(rootRef.current, shadowRef.current, p);
   });
 
   return (
     <group ref={rootRef}>
+      <mesh
+        ref={shadowRef}
+        rotation={[-Math.PI / 2, 0, 0]}
+        renderOrder={-1}
+      >
+        <planeGeometry args={[world.gridSize * 0.85, world.gridSize * 0.85]} />
+        <primitive object={shadowMaterial} attach="material" />
+      </mesh>
+
       <instancedMesh ref={dirtRef} args={[undefined, undefined, blocks.dirt.length]} receiveShadow frustumCulled={false}>
         <boxGeometry args={[1, 1, 1]} />
         <primitive object={materials.dirt} attach="material" />
