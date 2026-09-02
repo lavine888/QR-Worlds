@@ -1,7 +1,7 @@
 import qrcode from 'qrcode-generator';
 
 export const DEFAULT_CONTENT = 'https://qr-worlds.vercel.app/';
-export const QR_ERROR_CORRECTION = 'H' as const;
+export const QR_ERROR_CORRECTION = 'M' as const;
 export const MIN_QUIET_ZONE = 4;
 
 export type QRMatrix = {
@@ -63,7 +63,7 @@ export function generateQRMatrix(value: string, quietZone = MIN_QUIET_ZONE): QRM
   } catch (error) {
     const detail = error instanceof Error ? error.message : 'unknown encoder error';
     throw new QREncodingError(
-      'This content cannot fit in a version supported by the H-level QR encoder (' + detail + ').',
+      'This content cannot fit in a version supported by the M-level QR encoder (' + detail + ').',
     );
   }
 }
