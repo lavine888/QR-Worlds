@@ -71,50 +71,49 @@ function mix3(
 }
 
 const palette = {
-  dirtLight: [1.0, 0.98, 0.94] as const,
-  dirtDark: [0.92, 0.88, 0.82] as const,
-  sakuraLight: [0.76, 0.33, 0.46] as const,
-  sakuraDeep: [0.34, 0.055, 0.16] as const,
-  petalLight: [0.94, 0.57, 0.67] as const,
-  petalDeep: [0.49, 0.10, 0.24] as const,
-  barkLight: [0.34, 0.18, 0.07] as const,
-  barkDeep: [0.14, 0.06, 0.02] as const,
-  branchLight: [0.43, 0.22, 0.09] as const,
-  branchDeep: [0.18, 0.07, 0.025] as const,
-  grassLight: [0.12, 0.38, 0.08] as const,
-  grassDark: [0.05, 0.18, 0.04] as const,
-  fallenLight: [0.52, 0.42, 0.30] as const,
-  fallenDark: [0.32, 0.42, 0.24] as const,
+  dirtLight: [1.0, 0.985, 0.955] as const,
+  dirtDark: [0.89, 0.84, 0.76] as const,
+  sakuraLight: [0.96, 0.48, 0.62] as const,
+  sakuraDeep: [0.54, 0.12, 0.28] as const,
+  petalLight: [1.0, 0.67, 0.76] as const,
+  petalDeep: [0.66, 0.17, 0.36] as const,
+  barkLight: [0.46, 0.25, 0.11] as const,
+  barkDeep: [0.20, 0.075, 0.035] as const,
+  branchLight: [0.52, 0.29, 0.13] as const,
+  branchDeep: [0.24, 0.09, 0.04] as const,
+  grassLight: [0.23, 0.48, 0.14] as const,
+  grassDark: [0.08, 0.24, 0.055] as const,
+  fallenLight: [0.64, 0.52, 0.39] as const,
+  fallenDark: [0.34, 0.42, 0.24] as const,
 };
 
 function referenceColor(kind: VoxelKind, tone: number, scanAmount: number) {
   let color: THREE.Color;
   switch (kind) {
     case 'dirt':
-      color = mix3(palette.dirtLight, palette.dirtDark, tone * 0.82);
+      color = mix3(palette.dirtLight, palette.dirtDark, tone * 0.72);
       color.lerp(WHITE, scanAmount);
       break;
     case 'blossom':
-      color = mix3(palette.sakuraLight, palette.sakuraDeep, tone);
-      color.multiplyScalar(0.84 + Math.min(0.16, tone * 0.16));
+      color = mix3(palette.sakuraLight, palette.sakuraDeep, tone * 0.86);
       color.lerp(BLACK, scanAmount);
       break;
     case 'petal':
-      color = mix3(palette.petalLight, palette.petalDeep, tone * 0.9);
+      color = mix3(palette.petalLight, palette.petalDeep, tone * 0.82);
       break;
     case 'trunk':
-      color = mix3(palette.barkLight, palette.barkDeep, tone);
+      color = mix3(palette.barkLight, palette.barkDeep, tone * 0.88);
       color.lerp(BLACK, scanAmount);
       break;
     case 'branch':
-      color = mix3(palette.branchLight, palette.branchDeep, tone);
+      color = mix3(palette.branchLight, palette.branchDeep, tone * 0.88);
       break;
     case 'grass':
-      color = mix3(palette.grassLight, palette.grassDark, tone);
+      color = mix3(palette.grassLight, palette.grassDark, tone * 0.86);
       color.lerp(BLACK, scanAmount);
       break;
     case 'fallen':
-      color = mix3(palette.fallenLight, palette.fallenDark, tone);
+      color = mix3(palette.fallenLight, palette.fallenDark, tone * 0.78);
       color.lerp(BLACK, scanAmount);
       break;
   }
@@ -148,11 +147,12 @@ function writeInstances(
 }
 
 function makeMaterial() {
-  return new THREE.MeshStandardMaterial({
+  // Lambert keeps the voxel faces visibly shaded while avoiding the much
+  // darker ACES/standard-material path that produced black previews on some
+  // browser/GPU combinations.
+  return new THREE.MeshLambertMaterial({
     color: '#ffffff',
     vertexColors: true,
-    roughness: 0.95,
-    metalness: 0,
   });
 }
 
@@ -248,8 +248,6 @@ export function VoxelWorld({ matrix, seedText, worldSeed, progress }: VoxelWorld
       );
     }
 
-    // Organic branches and extra flower clusters establish the tree silhouette
-    // in the hero frame, then disappear before the QR begins turning black/white.
     const decorativeScale = 1 - smooth((p - 0.18) / 0.38);
     const scanAmount = smooth((p - 0.58) / 0.42);
     const quietAmount = smooth((p - 0.46) / 0.34);
