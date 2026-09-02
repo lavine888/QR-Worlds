@@ -32,6 +32,7 @@ export default function App() {
     <main className="reference-app">
       <section
         className="reference-canvas"
+        data-mode={scanMode ? 'scan' : 'world'}
         onClick={toggleMode}
         onKeyDown={handleKeyDown}
         role="button"
