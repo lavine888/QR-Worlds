@@ -40,16 +40,11 @@ input { font: inherit; }
   outline: none;
 }
 
-.reference-canvas:focus-visible {
-  outline: 2px solid rgb(74 124 78 / 24%);
-  outline-offset: -8px;
-}
-
 .reference-canvas canvas {
   display: block;
   width: 100% !important;
   height: 100% !important;
-  background: transparent;
+  background: #f7f7f7;
 }
 
 .reference-input {
@@ -78,10 +73,6 @@ input { font: inherit; }
 }
 
 .reference-field input::placeholder { color: #999; }
-
-.reference-field input:focus {
-  box-shadow: 0 1px 4px rgb(0 0 0 / 4%), 0 0 0 1px rgb(74 124 78 / 12%);
-}
 
 .reference-error {
   width: min(720px, calc(100% - 24px));
