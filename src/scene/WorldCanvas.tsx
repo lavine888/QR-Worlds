@@ -1,8 +1,8 @@
 import { Canvas } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { QRMatrix } from '../qr/generateQR';
+import { ReferenceVoxelWorldRefined } from './ReferenceVoxelWorldRefined';
 import type { WorldTheme } from './themes';
-import { ReferenceVoxelWorld } from './ReferenceVoxelWorld';
 
 type WorldCanvasProps = {
   matrix: QRMatrix;
@@ -31,7 +31,7 @@ export function WorldCanvas({ matrix, scanMode, onCanvasReady }: WorldCanvasProp
         onCanvasReady?.(gl.domElement);
       }}
     >
-      <ReferenceVoxelWorld matrix={matrix} scanMode={scanMode} />
+      <ReferenceVoxelWorldRefined matrix={matrix} scanMode={scanMode} />
     </Canvas>
   );
 }
