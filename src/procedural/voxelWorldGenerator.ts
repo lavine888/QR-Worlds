@@ -21,7 +21,6 @@ const TRUNK_RADIUS = 2.65;
 const TRUNK_LAYERS = 12;
 const MAX_CANOPY_LAYERS = 12;
 const CANOPY_OUTER_RADIUS_FACTOR = 0.46;
-const DECORATIVE_CLUSTER_COUNT = 11;
 
 function pseudoRandom(col: number, row: number, seed = 0) {
   const s = Math.sin(col * 127.1 + row * 311.7 + seed * 43.7) * 43758.5;
@@ -57,8 +56,7 @@ export function generateVoxelWorld(matrix: QRMatrix, _seed: number): VoxelWorldD
     return true;
   };
 
-  // Structural pass 1: one ground cube per QR module. This footprint is the
-  // authoritative symbol and is never modified by the decorative canopy.
+  // Structural pass 1: authoritative QR footprint.
   for (let row = 0; row < gridSize; row += 1) {
     for (let col = 0; col < gridSize; col += 1) {
       const isDark = qr[row][col];
@@ -73,11 +71,9 @@ export function generateVoxelWorld(matrix: QRMatrix, _seed: number): VoxelWorldD
     }
   }
 
-  // Structural pass 2: tapered trunk. Every block still belongs to a QR-dark
-  // column, but the upper courses narrow slightly so it reads like a trunk
-  // rather than a straight voxel pillar.
+  // Structural pass 2: restrained tapered trunk.
   for (let layer = 1; layer < TRUNK_LAYERS; layer += 1) {
-    const radius = layer < 4 ? 2.75 : layer < 9 ? 2.42 : 2.18;
+    const radius = layer < 4 ? 2.72 : layer < 9 ? 2.40 : 2.16;
     for (let row = 0; row < gridSize; row += 1) {
       for (let col = 0; col < gridSize; col += 1) {
         if (!qr[row][col]) continue;
@@ -88,9 +84,8 @@ export function generateVoxelWorld(matrix: QRMatrix, _seed: number): VoxelWorldD
     }
   }
 
-  // Structural pass 3: a restrained QR-owned blossom crown. Decorative
-  // clusters below will carry the organic silhouette, so this layer no longer
-  // needs exaggerated lobes that make the QR pattern itself look distorted.
+  // Structural pass 3: quiet QR-owned crown. This is deliberately regular;
+  // the decorative islands are responsible for the hand-built silhouette.
   for (let row = 0; row < gridSize; row += 1) {
     for (let col = 0; col < gridSize; col += 1) {
       if (!qr[row][col]) continue;
@@ -102,63 +97,74 @@ export function generateVoxelWorld(matrix: QRMatrix, _seed: number): VoxelWorldD
 
       const t = 1 - dist / canopyRadius;
       const angle = Math.atan2(dy, dx);
-      const smallLobe = Math.sin(angle * 3 + 0.55) * 0.7 + Math.sin(angle * 5 - 0.85) * 0.35;
-      const jitter = (pseudoRandom(col, row, 913) - 0.5) * 0.8;
+      const smallLobe = Math.sin(angle * 3 + 0.5) * 0.55 + Math.sin(angle * 5 - 0.8) * 0.24;
+      const jitter = (pseudoRandom(col, row, 913) - 0.5) * 0.55;
       const layersHere = Math.max(
         2,
-        Math.round(MAX_CANOPY_LAYERS * (0.2 + 0.8 * Math.pow(t, 1.75)) + smallLobe + jitter),
+        Math.round(MAX_CANOPY_LAYERS * (0.20 + 0.80 * Math.pow(t, 1.78)) + smallLobe + jitter),
       );
       const domeOffset = Math.floor(t * 3);
 
       let undercut = 0;
       if (dist < 4.0) undercut = 2;
-      else if (dist < 5.8 && pseudoRandom(col, row, 271) > 0.4) undercut = 1;
+      else if (dist < 5.7 && pseudoRandom(col, row, 271) > 0.42) undercut = 1;
       const startLayer = TRUNK_LAYERS + domeOffset + undercut;
 
       for (let layer = 0; layer < layersHere; layer += 1) {
         push('blossom', col, row, startLayer + layer, 40);
       }
 
-      const extraCount = Math.floor(pseudoRandom(col, row, 500) * (1.2 + t * 2.2));
+      const extraCount = Math.floor(pseudoRandom(col, row, 500) * (1.0 + t * 1.9));
       for (let extra = 0; extra < extraCount; extra += 1) {
         push('blossom', col, row, startLayer + layersHere + extra, 70);
       }
     }
   }
 
-  // Decorative pass: deterministic flower islands that exist only to make the
-  // 3D frame read as a cherry tree. They are deliberately NOT constrained to
-  // QR-dark cells. The vertex shader collapses them before the scene becomes
-  // flat, leaving the structural QR untouched.
+  // Decorative pass: nine intentionally composed blossom islands. Unlike the
+  // old evenly-spaced ring, these have clear hierarchy: three larger crown
+  // masses, four side masses and only two restrained lower accents. The result
+  // reads like one tree rather than a procedural halo around the QR.
+  const clusterSpecs = [
+    // angle, radius factor, height lift, size
+    [-2.30, 0.63, 3, 6],
+    [-1.57, 0.55, 5, 7],
+    [-0.82, 0.64, 4, 6],
+    [-2.88, 0.78, 1, 4],
+    [-0.22, 0.80, 2, 5],
+    [2.88, 0.80, 1, 4],
+    [0.34, 0.76, 2, 5],
+    [2.18, 0.68, 0, 3],
+    [0.98, 0.70, 0, 3],
+  ] as const;
+
   const clusterOffsets = [
     [0, 0, 0], [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0],
     [0, 0, 1], [1, 0, 1], [-1, 0, 1], [1, -1, 0], [-1, 1, 0],
   ] as const;
 
-  for (let cluster = 0; cluster < DECORATIVE_CLUSTER_COUNT; cluster += 1) {
-    const angleJitter = (pseudoRandom(cluster, 17, 701) - 0.5) * 0.34;
-    const angle = (cluster / DECORATIVE_CLUSTER_COUNT) * Math.PI * 2 + angleJitter;
-    const radiusFactor = 0.58 + pseudoRandom(cluster, 31, 702) * 0.43;
+  clusterSpecs.forEach(([angle, radiusFactor, heightLift, clusterSize], cluster) => {
     const radius = canopyRadius * radiusFactor;
     const anchorCol = Math.round(cx + Math.cos(angle) * radius);
     const anchorRow = Math.round(cy + Math.sin(angle) * radius);
     const radialT = Math.max(0, 1 - radius / canopyRadius);
-    const baseHeight =
-      TRUNK_LAYERS +
-      3 +
-      Math.round(radialT * 6) +
-      Math.round((pseudoRandom(cluster, 47, 703) - 0.35) * 4);
-    const clusterSize = 3 + Math.floor(pseudoRandom(cluster, 59, 704) * 4);
+    const baseHeight = TRUNK_LAYERS + 3 + Math.round(radialT * 6) + heightLift;
 
     for (let i = 0; i < clusterSize; i += 1) {
-      const [ox, oz, oy] = clusterOffsets[(i + cluster * 3) % clusterOffsets.length];
-      const lift = i > 2 && pseudoRandom(cluster, i, 705) > 0.45 ? 1 : 0;
+      const [ox, oz, oy] = clusterOffsets[(i + cluster * 2) % clusterOffsets.length];
+      const lift = i > 2 && pseudoRandom(cluster, i, 705) > 0.48 ? 1 : 0;
       const col = anchorCol + ox;
       const row = anchorRow + oz;
       if (col < 1 || row < 1 || col >= gridSize - 1 || row >= gridSize - 1) continue;
-      push('decorative', col, row, Math.max(TRUNK_LAYERS + 1, baseHeight + oy + lift), 110 + cluster * 7 + i);
+      push(
+        'decorative',
+        col,
+        row,
+        Math.max(TRUNK_LAYERS + 1, baseHeight + oy + lift),
+        110 + cluster * 7 + i,
+      );
     }
-  }
+  });
 
   return {
     blocks,
