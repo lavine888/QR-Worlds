@@ -1,36 +1,43 @@
 import { useFrame, useThree } from '@react-three/fiber';
-import { useEffect, useState, type MutableRefObject } from 'react';
+import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import * as THREE from 'three';
 
 type CameraRigProps = {
   target: number;
   progress: MutableRefObject<number>;
-  matrixSize: number;
 };
 
-const garden = new THREE.Vector3();
-const scan = new THREE.Vector3();
-const position = new THREE.Vector3();
-const gardenTarget = new THREE.Vector3();
-const scanTarget = new THREE.Vector3();
-const lookTarget = new THREE.Vector3();
+const LERP_SPEED = 4;
 
-const TRANSITION_SECONDS = 0.82;
-
-function rangeProgress(value: number, start: number, end: number) {
-  const local = THREE.MathUtils.clamp((value - start) / Math.max(0.001, end - start), 0, 1);
-  return THREE.MathUtils.smootherstep(local, 0, 1);
+function easeInOutCubic(t: number) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
 
-export function CameraRig({ target, progress, matrixSize }: CameraRigProps) {
+export function CameraRig({ target, progress }: CameraRigProps) {
   const { camera, size } = useThree();
+  const rawProgress = useRef(progress.current);
   const [reducedMotion, setReducedMotion] = useState(false);
 
   useEffect(() => {
+    camera.position.set(0, 0, 3);
+    camera.up.set(0, 1, 0);
+    camera.lookAt(0, 0, 0);
     camera.near = 0.1;
-    camera.far = 1000;
+    camera.far = 10;
+
+    if (camera instanceof THREE.OrthographicCamera) {
+      const aspect = Math.max(0.001, size.width / Math.max(1, size.height));
+      const horizontal = Math.max(aspect, 1);
+      const vertical = Math.max(1 / aspect, 1);
+      camera.left = -horizontal;
+      camera.right = horizontal;
+      camera.top = vertical;
+      camera.bottom = -vertical;
+      camera.zoom = 1;
+    }
+
     camera.updateProjectionMatrix();
-  }, [camera]);
+  }, [camera, size.height, size.width]);
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -42,39 +49,19 @@ export function CameraRig({ target, progress, matrixSize }: CameraRigProps) {
 
   useFrame((_, delta) => {
     if (reducedMotion) {
+      rawProgress.current = target;
       progress.current = target;
-    } else if (progress.current !== target) {
-      const direction = Math.sign(target - progress.current);
-      progress.current = THREE.MathUtils.clamp(
-        progress.current + direction * (delta / TRANSITION_SECONDS),
-        0,
-        1,
-      );
-      if (Math.abs(target - progress.current) < 0.001) progress.current = target;
+      return;
     }
 
-    const p = rangeProgress(progress.current, 0.03, 0.97);
-    const world = matrixSize;
+    rawProgress.current +=
+      (target - rawProgress.current) * Math.min(1, LERP_SPEED * Math.min(delta, 0.05));
 
-    garden.set(world * 0.66, world * 0.58, world * 0.74);
-    scan.set(0, world * 1.55, 0.001);
-    position.lerpVectors(garden, scan, p);
-    camera.position.copy(position);
-
-    gardenTarget.set(0, world * 0.13, 0);
-    scanTarget.set(0, 0, 0);
-    lookTarget.lerpVectors(gardenTarget, scanTarget, p);
-    camera.up.set(0, 1 - p, -p).normalize();
-    camera.lookAt(lookTarget);
-
-    if (camera instanceof THREE.OrthographicCamera) {
-      const minSide = Math.min(size.width, size.height);
-      const compact = size.width < 640;
-      const gardenZoom = minSide / (world * (compact ? 1.02 : 0.82));
-      const scanZoom = minSide / (world * 1.08);
-      camera.zoom = THREE.MathUtils.lerp(gardenZoom, scanZoom, rangeProgress(p, 0.08, 0.9));
-      camera.updateProjectionMatrix();
+    if (Math.abs(rawProgress.current - target) < 0.001) {
+      rawProgress.current = target;
     }
+
+    progress.current = easeInOutCubic(rawProgress.current);
   });
 
   return null;

@@ -11,12 +11,14 @@
   "dependencies": {
     "@react-three/fiber": "^9.3.0",
     "@zxing/browser": "^0.2.1",
+    "qrcode": "^1.5.4",
     "qrcode-generator": "^2.0.4",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "three": "^0.179.1"
   },
   "devDependencies": {
+    "@types/qrcode": "^1.5.5",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
     "@types/three": "^0.179.0",
