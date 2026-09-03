@@ -5,7 +5,7 @@ import { generateVoxelWorld, type VoxelKind } from '../procedural/voxelWorldGene
 import type { QRMatrix } from '../qr/generateQR';
 
 const BLOCK_SIZE = 0.0245;
-const LERP_SPEED = 4.6;
+const LERP_SPEED = 4.35;
 
 const KIND_TO_TYPE: Record<VoxelKind, number> = {
   dirt: 0,
@@ -51,11 +51,14 @@ varying float vLayer;
 
 void main() {
   float decorative = step(4.5, aType);
-  float decorativeExit = smoothstep(0.10, 0.60, uProgress);
-  float decorativeScale = mix(1.0, 0.012, decorativeExit);
+
+  // Decorative blossom islands leave early. They exist to sell the tree frame,
+  // not to participate in the QR reveal.
+  float decorativeExit = smoothstep(0.035, 0.43, uProgress);
+  float decorativeScale = mix(1.0, 0.01, decorativeExit);
 
   vec3 center = aCenter;
-  center.y -= decorative * decorativeExit * 0.055;
+  center.y -= decorative * decorativeExit * 0.048;
   vec3 p = center + aOffset * mix(1.0, decorativeScale, decorative);
 
   float angleY = mix(0.78, 0.0, uProgress);
@@ -70,13 +73,13 @@ void main() {
   float rxY = p.y * cx - ryZ * sx;
   float rxZ = p.y * sx + ryZ * cx;
 
-  // Make the tree state a little more dominant while preserving the reference
-  // flat scale exactly at the end of the reveal.
-  float viewScale = mix(1.70, 2.10, uProgress);
+  // Pull the 3D framing back toward the original reference proportions. The
+  // flat state stays at the reference 2.10 scale.
+  float viewScale = mix(1.64, 2.10, uProgress);
   float scaleX = viewScale / max(uAspect, 1.0);
   float scaleY = viewScale / max(1.0 / uAspect, 1.0);
   float offsetX = mix(0.0, 0.015, uProgress);
-  float offsetY = mix(0.012, 0.08, uProgress);
+  float offsetY = mix(0.006, 0.08, uProgress);
 
   gl_Position = vec4(
     (ryX + offsetX) * scaleX,
@@ -140,10 +143,10 @@ void main() {
   vec3 dirtMid = vec3(0.965, 0.945, 0.895);
   vec3 dirtDark = vec3(0.925, 0.89, 0.83);
 
-  vec3 sakuraLight = vec3(0.74, 0.29, 0.41);
-  vec3 sakuraMid = vec3(0.60, 0.19, 0.31);
-  vec3 sakuraDeep = vec3(0.47, 0.115, 0.235);
-  vec3 sakuraRich = vec3(0.36, 0.07, 0.18);
+  vec3 sakuraLight = vec3(0.73, 0.285, 0.405);
+  vec3 sakuraMid = vec3(0.595, 0.19, 0.305);
+  vec3 sakuraDeep = vec3(0.465, 0.115, 0.23);
+  vec3 sakuraRich = vec3(0.355, 0.07, 0.175);
 
   vec3 barkLight = vec3(0.37, 0.205, 0.085);
   vec3 barkMid = vec3(0.285, 0.145, 0.055);
@@ -151,8 +154,8 @@ void main() {
   vec3 barkDeep = vec3(0.145, 0.06, 0.02);
 
   vec3 grassDark = vec3(0.06, 0.17, 0.045);
-  vec3 grassMid = vec3(0.08, 0.25, 0.06);
-  vec3 grassBright = vec3(0.12, 0.34, 0.09);
+  vec3 grassMid = vec3(0.08, 0.245, 0.06);
+  vec3 grassBright = vec3(0.115, 0.325, 0.09);
 
   vec3 sunDir = normalize(vec3(-0.5, 0.8, -0.5));
   vec3 sunCol = vec3(1.15, 1.05, 0.95);
@@ -168,8 +171,8 @@ void main() {
   float dy = vRow - (cyGrid + 1.5);
   float shadowDist = length(vec2(dx, dy));
   float canopyRadius = uGridSize * 0.46;
-  float treeShadow = 1.0 - (1.0 - smoothstep(2.5, canopyRadius, shadowDist)) * 0.31;
-  float canopyAO = 0.68 + min(vLayer / 16.0, 1.0) * 0.32;
+  float treeShadow = 1.0 - (1.0 - smoothstep(2.5, canopyRadius, shadowDist)) * 0.29;
+  float canopyAO = 0.69 + min(vLayer / 16.0, 1.0) * 0.31;
 
   bool decorative = vType > 4.5;
   bool blossom = (vType > 0.5 && vType < 1.5) || decorative;
@@ -183,22 +186,23 @@ void main() {
 
   if (topFace) {
     vec3 warm = vec3(1.10, 1.08, 1.02);
+
     if (vType < 0.5) {
-      albedo = (noise1 < 0.5
+      albedo = noise1 < 0.5
         ? mix(dirtLight, dirtMid, noise1 / 0.5)
-        : mix(dirtMid, dirtDark, (noise1 - 0.5) / 0.5));
-      albedo *= (1.0 + (noise2 - 0.5) * 0.08) * treeShadow * warm;
+        : mix(dirtMid, dirtDark, (noise1 - 0.5) / 0.5);
+      albedo *= (1.0 + (noise2 - 0.5) * 0.07) * treeShadow * warm;
     } else if (blossom) {
       albedo = sakura(noise1, sakuraLight, sakuraMid, sakuraDeep, sakuraRich);
-      albedo *= 1.0 + (noise2 - 0.5) * 0.14;
+      albedo *= 1.0 + (noise2 - 0.5) * 0.13;
       float edge = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
-      float edgeShade = mix(0.88, 1.0, smoothstep(0.0, 0.12, edge));
+      float edgeShade = mix(0.89, 1.0, smoothstep(0.0, 0.12, edge));
       albedo *= warm * canopyAO * mix(edgeShade, 1.0, uProgress);
-      if (decorative) albedo *= 1.06;
+      if (decorative) albedo *= 1.045;
     } else if (trunk) {
       albedo = bark(noise1, barkLight, barkMid, barkDark, barkDeep);
-      float heightLift = 1.0 + smoothstep(5.0, 11.0, vLayer) * 0.055;
-      albedo *= heightLift * (1.0 + (noise2 - 0.5) * 0.17) * warm;
+      float heightLift = 1.0 + smoothstep(5.0, 11.0, vLayer) * 0.05;
+      albedo *= heightLift * (1.0 + (noise2 - 0.5) * 0.16) * warm;
     } else if (grass) {
       vec3 brown = vec3(0.27, 0.245, 0.13);
       vec3 olive = vec3(0.30, 0.325, 0.16);
@@ -212,22 +216,25 @@ void main() {
       vec3 brownDark = vec3(0.41, 0.32, 0.23);
       vec3 greenLight = vec3(0.36, 0.45, 0.29);
       vec3 greenDark = vec3(0.30, 0.39, 0.25);
-      albedo = noise1 < 0.5 ? mix(brownLight, brownDark, noise2) : mix(greenLight, greenDark, noise2);
+      albedo = noise1 < 0.5
+        ? mix(brownLight, brownDark, noise2)
+        : mix(greenLight, greenDark, noise2);
       albedo *= treeShadow * warm;
     }
   } else if (sideFace) {
     float shade = 0.30 + max(dot(N, sunDir), 0.0) * 0.65;
     vec3 tint = vec3(0.95, 0.95, 0.98);
+
     if (vType < 0.5) {
       albedo = mix(dirtMid, dirtDark, noise1) * shade * tint;
     } else if (blossom) {
       albedo = sakura(noise1, sakuraLight, sakuraMid, sakuraDeep, sakuraRich);
       float edge = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
-      albedo *= shade * tint * canopyAO * mix(0.70, 1.0, smoothstep(0.0, 0.12, edge));
-      if (decorative) albedo *= 1.045;
+      albedo *= shade * tint * canopyAO * mix(0.72, 1.0, smoothstep(0.0, 0.12, edge));
+      if (decorative) albedo *= 1.035;
     } else if (trunk) {
       albedo = bark(noise1, barkLight, barkMid, barkDark, barkDeep);
-      float heightLift = 1.0 + smoothstep(5.0, 11.0, vLayer) * 0.045;
+      float heightLift = 1.0 + smoothstep(5.0, 11.0, vLayer) * 0.04;
       albedo *= heightLift * shade * tint;
     } else if (grass) {
       albedo = mix(grassMid, grassDark, noise1) * shade * tint;
@@ -265,29 +272,39 @@ varying vec2 vUv;
 void main() {
   vec2 q = position.xy;
   vUv = q * 0.5 + 0.5;
+
   float halfGrid = uGridSize * ${BLOCK_SIZE.toFixed(4)} * 0.5;
-  float shadowScale = 0.88;
+  float shadowScale = 0.89;
   float shadowHeight = 0.48;
-  vec2 shadowOffset = vec2(0.5, 0.5) * shadowHeight * 0.30 * (1.0 - uProgress);
+  vec2 shadowOffset = vec2(0.5, 0.5) * shadowHeight * 0.28 * (1.0 - uProgress);
+
   float x = q.x * halfGrid * shadowScale + shadowOffset.x;
   float y = -shadowHeight;
   float z = q.y * halfGrid * shadowScale + shadowOffset.y;
 
   float angleY = mix(0.78, 0.0, uProgress);
   float angleX = mix(-0.55, -1.57079632679, uProgress);
-  float cy = cos(angleY); float sy = sin(angleY);
-  float cx = cos(angleX); float sx = sin(angleX);
+  float cy = cos(angleY);
+  float sy = sin(angleY);
+  float cx = cos(angleX);
+  float sx = sin(angleX);
+
   float ryX = x * cy - z * sy;
   float ryZ = x * sy + z * cy;
   float rxY = y * cx - ryZ * sx;
 
-  float viewScale = mix(1.70, 2.10, uProgress);
+  float viewScale = mix(1.64, 2.10, uProgress);
   float scaleX = viewScale / max(uAspect, 1.0);
   float scaleY = viewScale / max(1.0 / uAspect, 1.0);
   float offsetX = mix(0.0, 0.015, uProgress);
-  float offsetY = mix(0.012, 0.08, uProgress);
+  float offsetY = mix(0.006, 0.08, uProgress);
 
-  gl_Position = vec4((ryX + offsetX) * scaleX, (rxY + offsetY) * scaleY, 0.99, 1.0);
+  gl_Position = vec4(
+    (ryX + offsetX) * scaleX,
+    (rxY + offsetY) * scaleY,
+    0.99,
+    1.0
+  );
 }
 `;
 
@@ -295,11 +312,12 @@ const shadowFragmentShader = /* glsl */ `
 precision highp float;
 uniform float uProgress;
 varying vec2 vUv;
+
 void main() {
   vec2 p = vUv * 2.0 - 1.0;
   float d = length(p);
-  float presence = 1.0 - smoothstep(0.42, 0.94, uProgress);
-  float alpha = 0.058 * exp(-d * d * 2.15) * presence;
+  float presence = 1.0 - smoothstep(0.34, 0.88, uProgress);
+  float alpha = 0.050 * exp(-d * d * 2.02) * presence;
   vec3 ink = vec3(0.10, 0.12, 0.15) * alpha;
   gl_FragColor = vec4(ink, alpha);
 }
@@ -315,13 +333,15 @@ function easeInOutCubic(t: number) {
 }
 
 function revealCurve(t: number) {
-  if (t <= 0.12) return 0;
-  if (t < 0.78) {
-    const local = (t - 0.12) / 0.66;
-    return easeInOutCubic(local) * 0.88;
+  // A short hold, one decisive reveal, then a compact settle. Reverse uses the
+  // same curve, so returning to the tree feels equally deliberate.
+  if (t <= 0.10) return 0;
+  if (t < 0.80) {
+    const local = (t - 0.10) / 0.70;
+    return easeInOutCubic(local) * 0.91;
   }
-  const local = Math.min(1, (t - 0.78) / 0.22);
-  return 0.88 + (1 - Math.pow(1 - local, 3)) * 0.12;
+  const local = Math.min(1, (t - 0.80) / 0.20);
+  return 0.91 + (1 - Math.pow(1 - local, 3)) * 0.09;
 }
 
 function cubeOffset(face: number, u: number, v: number, half: number) {
@@ -383,6 +403,7 @@ function buildGeometry(matrix: QRMatrix) {
   geometry.setAttribute('aCol', new THREE.Float32BufferAttribute(cols, 1));
   geometry.setAttribute('aRow', new THREE.Float32BufferAttribute(rows, 1));
   geometry.setAttribute('aLayer', new THREE.Float32BufferAttribute(layers, 1));
+
   return { geometry, gridSize: world.gridSize };
 }
 
@@ -442,6 +463,7 @@ export function ReferenceVoxelWorldRefined({ matrix, scanMode }: Props) {
     const target = scanMode ? 1 : 0;
     rawProgress.current += (target - rawProgress.current) * Math.min(1, LERP_SPEED * delta);
     if (Math.abs(rawProgress.current - target) < 0.001) rawProgress.current = target;
+
     const progress = revealCurve(rawProgress.current);
     blockMaterial.uniforms.uProgress.value = progress;
     shadowMaterial.uniforms.uProgress.value = progress;
