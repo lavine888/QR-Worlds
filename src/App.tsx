@@ -1,9 +1,7 @@
 import { useMemo, useState, type KeyboardEvent } from 'react';
 import { QRInput } from './components/QRInput';
 import { useQR } from './hooks/useQR';
-import { hashString } from './procedural/hash';
 import { DEFAULT_CONTENT } from './qr/generateQR';
-import { getWorldTheme } from './scene/themes';
 import { WorldCanvas } from './scene/WorldCanvas';
 
 function readInitialContent() {
@@ -16,8 +14,6 @@ export default function App() {
   const [value, setValue] = useState(initialContent);
   const [scanMode, setScanMode] = useState(false);
   const { matrix, error } = useQR(value);
-  const theme = getWorldTheme('spring', 'pink');
-  const worldSeed = useMemo(() => hashString(`${matrix.content}:v6-reference`), [matrix.content]);
 
   const toggleMode = () => setScanMode((current) => !current);
 
@@ -39,13 +35,7 @@ export default function App() {
         tabIndex={0}
         aria-label={scanMode ? 'Return to the cherry blossom world' : 'Flatten the world into its QR code'}
       >
-        <WorldCanvas
-          matrix={matrix}
-          theme={theme}
-          seedText={matrix.content}
-          worldSeed={worldSeed}
-          scanMode={scanMode}
-        />
+        <WorldCanvas matrix={matrix} scanMode={scanMode} />
       </section>
 
       {error ? <div className="reference-error">{error}</div> : null}
