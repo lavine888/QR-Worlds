@@ -33,19 +33,40 @@ input { font: inherit; }
   position: relative;
   width: 100%;
   height: 60vh;
-  min-height: 350px;
-  margin-top: 9vh;
+  min-height: 340px;
+  margin-top: 10vh;
   flex: 0 0 auto;
   cursor: pointer;
   outline: none;
   overflow: hidden;
 }
 
-.reference-canvas canvas {
+.webgpu-world,
+.webgpu-canvas {
   display: block;
-  width: 100% !important;
-  height: 100% !important;
+  width: 100%;
+  height: 100%;
+}
+
+.webgpu-world {
+  position: relative;
   background: #f7f7f7;
+}
+
+.webgpu-canvas {
+  background: transparent;
+}
+
+.webgpu-error {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: min(420px, calc(100% - 32px));
+  transform: translate(-50%, -50%);
+  color: #777;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+  pointer-events: none;
 }
 
 .reference-input {
@@ -99,7 +120,7 @@ input { font: inherit; }
   .reference-canvas {
     height: 60vh;
     min-height: 320px;
-    margin-top: 8vh;
+    margin-top: 10vh;
   }
 
   .reference-input {
@@ -109,9 +130,9 @@ input { font: inherit; }
 
 @media (max-height: 690px) {
   .reference-canvas {
-    height: 59vh;
-    min-height: 295px;
-    margin-top: 6vh;
+    height: 60vh;
+    min-height: 290px;
+    margin-top: 7vh;
   }
 }
 
