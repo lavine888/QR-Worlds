@@ -1,5 +1,5 @@
 import { Canvas } from '@react-three/fiber';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import * as THREE from 'three';
 import type { QRMatrix } from '../qr/generateQR';
 import { WebGPUWorld } from '../webgpu/WebGPUWorld';
@@ -13,14 +13,14 @@ type WorldCanvasProps = {
 
 type RendererMode = 'webgpu' | 'webgl';
 
-type NavigatorWithGPU = Navigator & {
-  gpu?: {
-    requestAdapter: () => Promise<unknown | null>;
-  };
-};
+type NavigatorWithGPU = Navigator & { gpu?: unknown };
 
 function hasWebGPU() {
   return typeof navigator !== 'undefined' && Boolean((navigator as NavigatorWithGPU).gpu);
+}
+
+function isDebugMode() {
+  return typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
 }
 
 function WebGLFallback({ matrix, scanMode, onCanvasReady }: WorldCanvasProps) {
@@ -49,43 +49,29 @@ function WebGLFallback({ matrix, scanMode, onCanvasReady }: WorldCanvasProps) {
 
 export function WorldCanvas({ matrix, scanMode, onCanvasReady }: WorldCanvasProps) {
   const [mode, setMode] = useState<RendererMode>(() => (hasWebGPU() ? 'webgpu' : 'webgl'));
-
-  useEffect(() => {
-    const gpu = (navigator as NavigatorWithGPU).gpu;
-    if (!gpu) {
-      setMode('webgl');
-      return;
-    }
-
-    let cancelled = false;
-    gpu.requestAdapter()
-      .then((adapter) => {
-        if (!cancelled && !adapter) setMode('webgl');
-      })
-      .catch(() => {
-        if (!cancelled) setMode('webgl');
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (mode === 'webgl') {
-    return (
-      <WebGLFallback
-        matrix={matrix}
-        scanMode={scanMode}
-        onCanvasReady={onCanvasReady}
-      />
-    );
-  }
+  const debug = isDebugMode();
 
   return (
-    <WebGPUWorld
-      matrix={matrix}
-      scanMode={scanMode}
-      onCanvasReady={onCanvasReady}
-    />
+    <div className="reference-stage" data-renderer={mode}>
+      {mode === 'webgl' ? (
+        <WebGLFallback
+          matrix={matrix}
+          scanMode={scanMode}
+          onCanvasReady={onCanvasReady}
+        />
+      ) : (
+        <WebGPUWorld
+          matrix={matrix}
+          scanMode={scanMode}
+          onCanvasReady={onCanvasReady}
+          onUnavailable={() => setMode('webgl')}
+        />
+      )}
+      {debug ? (
+        <div className="renderer-debug">
+          {mode.toUpperCase()} · {matrix.moduleCount}×{matrix.moduleCount}
+        </div>
+      ) : null}
+    </div>
   );
 }

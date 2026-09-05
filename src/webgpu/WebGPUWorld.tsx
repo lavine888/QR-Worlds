@@ -11,12 +11,13 @@ import {
 } from './shaders';
 
 const LERP_SPEED = 4;
-const UNIFORM_FLOATS = 8;
+const UNIFORM_FLOATS = 16;
 
 type Props = {
   matrix: QRMatrix;
   scanMode: boolean;
   onCanvasReady?: (canvas: HTMLCanvasElement) => void;
+  onUnavailable?: () => void;
 };
 
 type GPULike = any;
@@ -66,7 +67,8 @@ class ReferenceWebGPURenderer {
   private uniformBuffer: GPULike = null;
   private typeBuffer: GPULike = null;
   private positionBuffer: GPULike = null;
-  private baseLayerBuffer: GPULike = null;
+  private resistanceBuffer: GPULike = null;
+  private baseYBuffer: GPULike = null;
   private depthTexture: GPULike = null;
 
   private blockLayout: GPULike = null;
@@ -86,10 +88,12 @@ class ReferenceWebGPURenderer {
   private startTime = performance.now();
   private destroyed = false;
   private resizeObserver: ResizeObserver | null = null;
+  private onLost: () => void;
 
-  constructor(canvas: HTMLCanvasElement, matrix: QRMatrix) {
+  constructor(canvas: HTMLCanvasElement, matrix: QRMatrix, onLost: () => void) {
     this.canvas = canvas;
     this.blockData = buildGPUBlockData(matrix);
+    this.onLost = onLost;
   }
 
   async init() {
@@ -138,6 +142,11 @@ class ReferenceWebGPURenderer {
         },
         {
           binding: 3,
+          visibility: shaderStage.VERTEX,
+          buffer: { type: 'read-only-storage' },
+        },
+        {
+          binding: 4,
           visibility: shaderStage.VERTEX,
           buffer: { type: 'read-only-storage' },
         },
@@ -199,11 +208,15 @@ class ReferenceWebGPURenderer {
 
     this.uploadBlockData(this.blockData);
     this.installResizeObserver();
+    this.lastFrame = performance.now();
+    this.startTime = this.lastFrame;
     this.render();
 
     this.device.lost.then(() => {
+      if (this.destroyed) return;
       this.destroyed = true;
       cancelAnimationFrame(this.animationFrame);
+      this.onLost();
     });
   }
 
@@ -222,7 +235,8 @@ class ReferenceWebGPURenderer {
     this.resizeObserver?.disconnect();
     this.typeBuffer?.destroy?.();
     this.positionBuffer?.destroy?.();
-    this.baseLayerBuffer?.destroy?.();
+    this.resistanceBuffer?.destroy?.();
+    this.baseYBuffer?.destroy?.();
     this.uniformBuffer?.destroy?.();
     this.depthTexture?.destroy?.();
   }
@@ -231,7 +245,8 @@ class ReferenceWebGPURenderer {
     const usage = (globalThis as any).GPUBufferUsage;
     this.typeBuffer?.destroy?.();
     this.positionBuffer?.destroy?.();
-    this.baseLayerBuffer?.destroy?.();
+    this.resistanceBuffer?.destroy?.();
+    this.baseYBuffer?.destroy?.();
 
     this.typeBuffer = this.device.createBuffer({
       size: Math.max(4, data.types.byteLength),
@@ -241,14 +256,19 @@ class ReferenceWebGPURenderer {
       size: Math.max(16, data.positions.byteLength),
       usage: usage.STORAGE | usage.COPY_DST,
     });
-    this.baseLayerBuffer = this.device.createBuffer({
-      size: Math.max(4, data.baseLayers.byteLength),
+    this.resistanceBuffer = this.device.createBuffer({
+      size: Math.max(4, data.resistance.byteLength),
+      usage: usage.STORAGE | usage.COPY_DST,
+    });
+    this.baseYBuffer = this.device.createBuffer({
+      size: Math.max(4, data.baseY.byteLength),
       usage: usage.STORAGE | usage.COPY_DST,
     });
 
     this.device.queue.writeBuffer(this.typeBuffer, 0, data.types);
     this.device.queue.writeBuffer(this.positionBuffer, 0, data.positions);
-    this.device.queue.writeBuffer(this.baseLayerBuffer, 0, data.baseLayers);
+    this.device.queue.writeBuffer(this.resistanceBuffer, 0, data.resistance);
+    this.device.queue.writeBuffer(this.baseYBuffer, 0, data.baseY);
 
     this.blockBindGroup = this.device.createBindGroup({
       layout: this.blockLayout,
@@ -256,7 +276,8 @@ class ReferenceWebGPURenderer {
         { binding: 0, resource: { buffer: this.uniformBuffer } },
         { binding: 1, resource: { buffer: this.typeBuffer } },
         { binding: 2, resource: { buffer: this.positionBuffer } },
-        { binding: 3, resource: { buffer: this.baseLayerBuffer } },
+        { binding: 3, resource: { buffer: this.resistanceBuffer } },
+        { binding: 4, resource: { buffer: this.baseYBuffer } },
       ],
     });
   }
@@ -269,7 +290,7 @@ class ReferenceWebGPURenderer {
 
   private resizeCanvas() {
     if (!this.device) return;
-    const ratio = Math.min(window.devicePixelRatio || 1, 2);
+    const ratio = Math.max(1, window.devicePixelRatio || 1);
     const rect = this.canvas.getBoundingClientRect();
     const width = Math.max(1, Math.round(rect.width * ratio));
     const height = Math.max(1, Math.round(rect.height * ratio));
@@ -298,25 +319,29 @@ class ReferenceWebGPURenderer {
       this.rawProgress = this.targetProgress;
     }
     const progress = easeInOutCubic(this.rawProgress);
-    const aspect = this.canvas.width / Math.max(1, this.canvas.height);
-    const uniforms = new Float32Array([
-      aspect,
-      (now - this.startTime) / 1000,
-      this.blockData.numBlocks,
-      progress,
-      this.blockData.gridSize,
-      0,
-      0,
-      0,
-    ]);
-    this.device.queue.writeBuffer(this.uniformBuffer, 0, uniforms);
+    const aspectRatio = this.canvas.width / Math.max(1, this.canvas.height);
+    const uniformData = new Float32Array(UNIFORM_FLOATS);
+    uniformData[0] = aspectRatio;
+    uniformData[1] = (now - this.startTime) / 1000;
+    uniformData[2] = this.blockData.numBlocks;
+    uniformData[3] = progress;
+    uniformData[4] = this.blockData.gridSize;
+    uniformData[5] = -1;
+    uniformData[6] = 0;
+    uniformData[7] = -1;
+    uniformData[8] = 0;
+    uniformData[9] = 0;
+    uniformData[10] = 0;
+    uniformData[11] = 0;
+    uniformData[12] = 0;
+    this.device.queue.writeBuffer(this.uniformBuffer, 0, uniformData);
 
     const encoder = this.device.createCommandEncoder();
     const pass = encoder.beginRenderPass({
       colorAttachments: [
         {
           view: this.context.getCurrentTexture().createView(),
-          clearValue: { r: 0.96862745, g: 0.96862745, b: 0.96862745, a: 1 },
+          clearValue: { r: 0, g: 0, b: 0, a: 0 },
           loadOp: 'clear',
           storeOp: 'store',
         },
@@ -347,7 +372,7 @@ class ReferenceWebGPURenderer {
   };
 }
 
-export function WebGPUWorld({ matrix, scanMode, onCanvasReady }: Props) {
+export function WebGPUWorld({ matrix, scanMode, onCanvasReady, onUnavailable }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<ReferenceWebGPURenderer | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -357,15 +382,21 @@ export function WebGPUWorld({ matrix, scanMode, onCanvasReady }: Props) {
     if (!canvas) return;
 
     let cancelled = false;
-    const renderer = new ReferenceWebGPURenderer(canvas, matrix);
+    const fail = (cause?: unknown) => {
+      if (cancelled) return;
+      if (onUnavailable) {
+        onUnavailable();
+      } else {
+        setError(cause instanceof Error ? cause.message : 'WebGPU initialization failed.');
+      }
+    };
+
+    const renderer = new ReferenceWebGPURenderer(canvas, matrix, () => fail());
     rendererRef.current = renderer;
     renderer.setFlat(scanMode);
     onCanvasReady?.(canvas);
 
-    renderer.init().catch((cause) => {
-      if (cancelled) return;
-      setError(cause instanceof Error ? cause.message : 'WebGPU initialization failed.');
-    });
+    renderer.init().catch(fail);
 
     return () => {
       cancelled = true;
