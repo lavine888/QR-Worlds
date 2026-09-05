@@ -1,5 +1,5 @@
 import { Canvas } from '@react-three/fiber';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import * as THREE from 'three';
 import type { QRMatrix } from '../qr/generateQR';
 import { WebGPUWorld } from '../webgpu/WebGPUWorld';
@@ -13,11 +13,7 @@ type WorldCanvasProps = {
 
 type RendererMode = 'webgpu' | 'webgl';
 
-type NavigatorWithGPU = Navigator & {
-  gpu?: {
-    requestAdapter: () => Promise<unknown | null>;
-  };
-};
+type NavigatorWithGPU = Navigator & { gpu?: unknown };
 
 function hasWebGPU() {
   return typeof navigator !== 'undefined' && Boolean((navigator as NavigatorWithGPU).gpu);
@@ -50,27 +46,6 @@ function WebGLFallback({ matrix, scanMode, onCanvasReady }: WorldCanvasProps) {
 export function WorldCanvas({ matrix, scanMode, onCanvasReady }: WorldCanvasProps) {
   const [mode, setMode] = useState<RendererMode>(() => (hasWebGPU() ? 'webgpu' : 'webgl'));
 
-  useEffect(() => {
-    const gpu = (navigator as NavigatorWithGPU).gpu;
-    if (!gpu) {
-      setMode('webgl');
-      return;
-    }
-
-    let cancelled = false;
-    gpu.requestAdapter()
-      .then((adapter) => {
-        if (!cancelled && !adapter) setMode('webgl');
-      })
-      .catch(() => {
-        if (!cancelled) setMode('webgl');
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   if (mode === 'webgl') {
     return (
       <WebGLFallback
@@ -86,6 +61,7 @@ export function WorldCanvas({ matrix, scanMode, onCanvasReady }: WorldCanvasProp
       matrix={matrix}
       scanMode={scanMode}
       onCanvasReady={onCanvasReady}
+      onUnavailable={() => setMode('webgl')}
     />
   );
 }
