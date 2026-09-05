@@ -19,6 +19,10 @@ function hasWebGPU() {
   return typeof navigator !== 'undefined' && Boolean((navigator as NavigatorWithGPU).gpu);
 }
 
+function isDebugMode() {
+  return typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
+}
+
 function WebGLFallback({ matrix, scanMode, onCanvasReady }: WorldCanvasProps) {
   return (
     <Canvas
@@ -45,6 +49,7 @@ function WebGLFallback({ matrix, scanMode, onCanvasReady }: WorldCanvasProps) {
 
 export function WorldCanvas({ matrix, scanMode, onCanvasReady }: WorldCanvasProps) {
   const [mode, setMode] = useState<RendererMode>(() => (hasWebGPU() ? 'webgpu' : 'webgl'));
+  const debug = isDebugMode();
 
   return (
     <div className="reference-stage" data-renderer={mode}>
@@ -62,6 +67,11 @@ export function WorldCanvas({ matrix, scanMode, onCanvasReady }: WorldCanvasProp
           onUnavailable={() => setMode('webgl')}
         />
       )}
+      {debug ? (
+        <div className="renderer-debug">
+          {mode.toUpperCase()} · {matrix.moduleCount}×{matrix.moduleCount}
+        </div>
+      ) : null}
     </div>
   );
 }
