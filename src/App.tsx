@@ -4,8 +4,11 @@ import { useQR } from './hooks/useQR';
 import { DEFAULT_CONTENT } from './qr/generateQR';
 import { WorldCanvas } from './scene/WorldCanvas';
 
+const REFERENCE_BENCHMARK_CONTENT = 'https://enzo.fyi';
+
 function readInitialContent() {
   const params = new URLSearchParams(window.location.search);
+  if (params.get('benchmark') === '1') return REFERENCE_BENCHMARK_CONTENT;
   return params.get('data') || DEFAULT_CONTENT;
 }
 
