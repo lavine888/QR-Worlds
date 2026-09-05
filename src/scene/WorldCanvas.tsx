@@ -46,22 +46,22 @@ function WebGLFallback({ matrix, scanMode, onCanvasReady }: WorldCanvasProps) {
 export function WorldCanvas({ matrix, scanMode, onCanvasReady }: WorldCanvasProps) {
   const [mode, setMode] = useState<RendererMode>(() => (hasWebGPU() ? 'webgpu' : 'webgl'));
 
-  if (mode === 'webgl') {
-    return (
-      <WebGLFallback
-        matrix={matrix}
-        scanMode={scanMode}
-        onCanvasReady={onCanvasReady}
-      />
-    );
-  }
-
   return (
-    <WebGPUWorld
-      matrix={matrix}
-      scanMode={scanMode}
-      onCanvasReady={onCanvasReady}
-      onUnavailable={() => setMode('webgl')}
-    />
+    <div className="reference-stage" data-renderer={mode}>
+      {mode === 'webgl' ? (
+        <WebGLFallback
+          matrix={matrix}
+          scanMode={scanMode}
+          onCanvasReady={onCanvasReady}
+        />
+      ) : (
+        <WebGPUWorld
+          matrix={matrix}
+          scanMode={scanMode}
+          onCanvasReady={onCanvasReady}
+          onUnavailable={() => setMode('webgl')}
+        />
+      )}
+    </div>
   );
 }
