@@ -12,10 +12,13 @@ import {
 
 const LERP_SPEED = 4;
 const UNIFORM_FLOATS = 16;
+const MAX_GRID_SIZE = 41;
+const MAX_BLOCKS = MAX_GRID_SIZE * MAX_GRID_SIZE * 18;
 
 type Props = {
   matrix: QRMatrix;
   scanMode: boolean;
+  fixedProgress?: number | null;
   onCanvasReady?: (canvas: HTMLCanvasElement) => void;
   onUnavailable?: () => void;
 };
@@ -83,6 +86,7 @@ class ReferenceWebGPURenderer {
   private blockData: GPUBlockData;
   private targetProgress = 0;
   private rawProgress = 0;
+  private fixedProgress: number | null;
   private animationFrame = 0;
   private lastFrame = performance.now();
   private startTime = performance.now();
@@ -90,9 +94,15 @@ class ReferenceWebGPURenderer {
   private resizeObserver: ResizeObserver | null = null;
   private onLost: () => void;
 
-  constructor(canvas: HTMLCanvasElement, matrix: QRMatrix, onLost: () => void) {
+  constructor(
+    canvas: HTMLCanvasElement,
+    matrix: QRMatrix,
+    fixedProgress: number | null,
+    onLost: () => void,
+  ) {
     this.canvas = canvas;
     this.blockData = buildGPUBlockData(matrix);
+    this.fixedProgress = fixedProgress;
     this.onLost = onLost;
   }
 
@@ -121,6 +131,23 @@ class ReferenceWebGPURenderer {
     this.uniformBuffer = this.device.createBuffer({
       size: UNIFORM_FLOATS * 4,
       usage: usage.UNIFORM | usage.COPY_DST,
+    });
+
+    this.typeBuffer = this.device.createBuffer({
+      size: MAX_BLOCKS * 4,
+      usage: usage.STORAGE | usage.COPY_DST,
+    });
+    this.positionBuffer = this.device.createBuffer({
+      size: MAX_BLOCKS * 16,
+      usage: usage.STORAGE | usage.COPY_DST,
+    });
+    this.resistanceBuffer = this.device.createBuffer({
+      size: MAX_BLOCKS * 4,
+      usage: usage.STORAGE | usage.COPY_DST,
+    });
+    this.baseYBuffer = this.device.createBuffer({
+      size: MAX_BLOCKS * 4,
+      usage: usage.STORAGE | usage.COPY_DST,
     });
 
     this.blockLayout = this.device.createBindGroupLayout({
@@ -168,6 +195,17 @@ class ReferenceWebGPURenderer {
       entries: [{ binding: 0, resource: { buffer: this.uniformBuffer } }],
     });
 
+    this.blockBindGroup = this.device.createBindGroup({
+      layout: this.blockLayout,
+      entries: [
+        { binding: 0, resource: { buffer: this.uniformBuffer } },
+        { binding: 1, resource: { buffer: this.typeBuffer } },
+        { binding: 2, resource: { buffer: this.positionBuffer } },
+        { binding: 3, resource: { buffer: this.resistanceBuffer } },
+        { binding: 4, resource: { buffer: this.baseYBuffer } },
+      ],
+    });
+
     const alphaBlend = {
       color: {
         srcFactor: 'src-alpha',
@@ -180,6 +218,8 @@ class ReferenceWebGPURenderer {
         operation: 'add',
       },
     };
+
+    this.device.pushErrorScope?.('validation');
 
     this.skyPipeline = createPipeline(
       this.device,
@@ -206,6 +246,11 @@ class ReferenceWebGPURenderer {
       { depthWrite: true, depthCompare: 'less' },
     );
 
+    const validationError = await this.device.popErrorScope?.();
+    if (validationError) {
+      throw new Error(`WebGPU pipeline validation failed: ${validationError.message}`);
+    }
+
     this.uploadBlockData(this.blockData);
     this.installResizeObserver();
     this.lastFrame = performance.now();
@@ -222,6 +267,13 @@ class ReferenceWebGPURenderer {
 
   setFlat(flat: boolean) {
     this.targetProgress = flat ? 1 : 0;
+  }
+
+  setFixedProgress(progress: number | null) {
+    this.fixedProgress = progress;
+    if (progress !== null) {
+      this.rawProgress = progress;
+    }
   }
 
   setMatrix(matrix: QRMatrix) {
@@ -242,44 +294,25 @@ class ReferenceWebGPURenderer {
   }
 
   private uploadBlockData(data: GPUBlockData) {
-    const usage = (globalThis as any).GPUBufferUsage;
-    this.typeBuffer?.destroy?.();
-    this.positionBuffer?.destroy?.();
-    this.resistanceBuffer?.destroy?.();
-    this.baseYBuffer?.destroy?.();
+    if (data.numBlocks > MAX_BLOCKS) {
+      throw new Error(
+        `QR world requires ${data.numBlocks} blocks, above the reference renderer limit of ${MAX_BLOCKS}.`,
+      );
+    }
 
-    this.typeBuffer = this.device.createBuffer({
-      size: Math.max(4, data.types.byteLength),
-      usage: usage.STORAGE | usage.COPY_DST,
-    });
-    this.positionBuffer = this.device.createBuffer({
-      size: Math.max(16, data.positions.byteLength),
-      usage: usage.STORAGE | usage.COPY_DST,
-    });
-    this.resistanceBuffer = this.device.createBuffer({
-      size: Math.max(4, data.resistance.byteLength),
-      usage: usage.STORAGE | usage.COPY_DST,
-    });
-    this.baseYBuffer = this.device.createBuffer({
-      size: Math.max(4, data.baseY.byteLength),
-      usage: usage.STORAGE | usage.COPY_DST,
-    });
+    const paddedTypes = new Uint32Array(MAX_BLOCKS);
+    paddedTypes.set(data.types);
+    const paddedPositions = new Float32Array(MAX_BLOCKS * 4);
+    paddedPositions.set(data.positions);
+    const paddedResistance = new Float32Array(MAX_BLOCKS);
+    paddedResistance.set(data.resistance);
+    const paddedBaseY = new Float32Array(MAX_BLOCKS);
+    paddedBaseY.set(data.baseY);
 
-    this.device.queue.writeBuffer(this.typeBuffer, 0, data.types);
-    this.device.queue.writeBuffer(this.positionBuffer, 0, data.positions);
-    this.device.queue.writeBuffer(this.resistanceBuffer, 0, data.resistance);
-    this.device.queue.writeBuffer(this.baseYBuffer, 0, data.baseY);
-
-    this.blockBindGroup = this.device.createBindGroup({
-      layout: this.blockLayout,
-      entries: [
-        { binding: 0, resource: { buffer: this.uniformBuffer } },
-        { binding: 1, resource: { buffer: this.typeBuffer } },
-        { binding: 2, resource: { buffer: this.positionBuffer } },
-        { binding: 3, resource: { buffer: this.resistanceBuffer } },
-        { binding: 4, resource: { buffer: this.baseYBuffer } },
-      ],
-    });
+    this.device.queue.writeBuffer(this.typeBuffer, 0, paddedTypes);
+    this.device.queue.writeBuffer(this.positionBuffer, 0, paddedPositions);
+    this.device.queue.writeBuffer(this.resistanceBuffer, 0, paddedResistance);
+    this.device.queue.writeBuffer(this.baseYBuffer, 0, paddedBaseY);
   }
 
   private installResizeObserver() {
@@ -313,12 +346,18 @@ class ReferenceWebGPURenderer {
     const dt = Math.min((now - this.lastFrame) / 1000, 0.05);
     this.lastFrame = now;
 
-    this.rawProgress +=
-      (this.targetProgress - this.rawProgress) * Math.min(1, LERP_SPEED * dt);
-    if (Math.abs(this.rawProgress - this.targetProgress) < 0.001) {
-      this.rawProgress = this.targetProgress;
+    let progress: number;
+    if (this.fixedProgress !== null) {
+      progress = this.fixedProgress;
+    } else {
+      this.rawProgress +=
+        (this.targetProgress - this.rawProgress) * Math.min(1, LERP_SPEED * dt);
+      if (Math.abs(this.rawProgress - this.targetProgress) < 0.001) {
+        this.rawProgress = this.targetProgress;
+      }
+      progress = easeInOutCubic(this.rawProgress);
     }
-    const progress = easeInOutCubic(this.rawProgress);
+
     const aspectRatio = this.canvas.width / Math.max(1, this.canvas.height);
     const uniformData = new Float32Array(UNIFORM_FLOATS);
     uniformData[0] = aspectRatio;
@@ -372,7 +411,13 @@ class ReferenceWebGPURenderer {
   };
 }
 
-export function WebGPUWorld({ matrix, scanMode, onCanvasReady, onUnavailable }: Props) {
+export function WebGPUWorld({
+  matrix,
+  scanMode,
+  fixedProgress = null,
+  onCanvasReady,
+  onUnavailable,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<ReferenceWebGPURenderer | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -391,7 +436,12 @@ export function WebGPUWorld({ matrix, scanMode, onCanvasReady, onUnavailable }: 
       }
     };
 
-    const renderer = new ReferenceWebGPURenderer(canvas, matrix, () => fail());
+    const renderer = new ReferenceWebGPURenderer(
+      canvas,
+      matrix,
+      fixedProgress,
+      () => fail(new Error('WebGPU device was lost.')),
+    );
     rendererRef.current = renderer;
     renderer.setFlat(scanMode);
     onCanvasReady?.(canvas);
@@ -410,7 +460,19 @@ export function WebGPUWorld({ matrix, scanMode, onCanvasReady, onUnavailable }: 
   }, [scanMode]);
 
   useEffect(() => {
-    rendererRef.current?.setMatrix(matrix);
+    rendererRef.current?.setFixedProgress(fixedProgress);
+  }, [fixedProgress]);
+
+  useEffect(() => {
+    try {
+      rendererRef.current?.setMatrix(matrix);
+    } catch (cause) {
+      if (onUnavailable) {
+        onUnavailable();
+      } else {
+        setError(cause instanceof Error ? cause.message : 'Failed to update QR world buffers.');
+      }
+    }
   }, [matrix.content, matrix.moduleCount]);
 
   return (
