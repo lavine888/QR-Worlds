@@ -1,7 +1,7 @@
 {
   "name": "qr-worlds",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,14 +13,17 @@
     "@zxing/browser": "^0.2.1",
     "qrcode": "^1.5.4",
     "qrcode-generator": "^2.0.4",
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.85.3",
+    "react-native-web": "^0.21.0",
+    "react-native-webgpu": "0.5.14",
     "three": "^0.179.1"
   },
   "devDependencies": {
     "@types/qrcode": "^1.5.5",
-    "@types/react": "^19.1.10",
-    "@types/react-dom": "^19.1.7",
+    "@types/react": "~19.2.10",
+    "@types/react-dom": "^19.2.3",
     "@types/three": "^0.179.0",
     "@vitejs/plugin-react": "^5.0.2",
     "typescript": "~5.9.2",
