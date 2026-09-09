@@ -8,6 +8,8 @@ import { ReferenceVoxelWorldRefined } from './ReferenceVoxelWorldRefined';
 type WorldCanvasProps = {
   matrix: QRMatrix;
   scanMode: boolean;
+  fixedProgress?: number | null;
+  forceWebGPU?: boolean;
   onCanvasReady?: (canvas: HTMLCanvasElement) => void;
 };
 
@@ -47,9 +49,22 @@ function WebGLFallback({ matrix, scanMode, onCanvasReady }: WorldCanvasProps) {
   );
 }
 
-export function WorldCanvas({ matrix, scanMode, onCanvasReady }: WorldCanvasProps) {
-  const [mode, setMode] = useState<RendererMode>(() => (hasWebGPU() ? 'webgpu' : 'webgl'));
+export function WorldCanvas({
+  matrix,
+  scanMode,
+  fixedProgress = null,
+  forceWebGPU = false,
+  onCanvasReady,
+}: WorldCanvasProps) {
+  const [mode, setMode] = useState<RendererMode>(() => (
+    forceWebGPU || hasWebGPU() ? 'webgpu' : 'webgl'
+  ));
   const debug = isDebugMode();
+  const viewportLabel = typeof window === 'undefined'
+    ? ''
+    : `${window.innerWidth}×${Math.round(window.innerHeight * 0.6)}`;
+
+  const handleUnavailable = forceWebGPU ? undefined : () => setMode('webgl');
 
   return (
     <div className="reference-stage" data-renderer={mode}>
@@ -63,13 +78,17 @@ export function WorldCanvas({ matrix, scanMode, onCanvasReady }: WorldCanvasProp
         <WebGPUWorld
           matrix={matrix}
           scanMode={scanMode}
+          fixedProgress={fixedProgress}
           onCanvasReady={onCanvasReady}
-          onUnavailable={() => setMode('webgl')}
+          onUnavailable={handleUnavailable}
         />
       )}
       {debug ? (
         <div className="renderer-debug">
           {mode.toUpperCase()} · {matrix.moduleCount}×{matrix.moduleCount}
+          {fixedProgress !== null ? ` · P=${fixedProgress.toFixed(2)}` : ''}
+          {viewportLabel ? ` · ${viewportLabel}` : ''}
+          {forceWebGPU ? ' · FORCED' : ''}
         </div>
       ) : null}
     </div>
