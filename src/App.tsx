@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { QRInput } from './components/QRInput';
 import { useQR } from './hooks/useQR';
 import { DEFAULT_CONTENT } from './qr/generateQR';
@@ -53,11 +53,13 @@ function readRuntimeOptions(): RuntimeOptions {
 
 export default function App() {
   const runtime = useMemo(readRuntimeOptions, []);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState(runtime.initialContent);
   const [scanMode, setScanMode] = useState(false);
   const { matrix, error } = useQR(value);
 
   const toggleMode = () => {
+    inputRef.current?.focus();
     if (runtime.fixedProgress !== null) return;
     setScanMode((current) => !current);
   };
@@ -110,7 +112,7 @@ export default function App() {
       {error ? <div className="reference-error">{error}</div> : null}
 
       <div className="reference-input" onClick={(event) => event.stopPropagation()}>
-        <QRInput value={value} onChange={setValue} />
+        <QRInput ref={inputRef} value={value} onChange={setValue} />
       </div>
     </main>
   );
