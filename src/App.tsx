@@ -1,4 +1,4 @@
-import { useMemo, useState, type KeyboardEvent } from 'react';
+import { useMemo, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { QRInput } from './components/QRInput';
 import { useQR } from './hooks/useQR';
 import { DEFAULT_CONTENT } from './qr/generateQR';
@@ -6,11 +6,32 @@ import { WorldCanvas } from './scene/WorldCanvas';
 
 const REFERENCE_BENCHMARK_CONTENT = 'https://enzo.fyi';
 
+type FixedViewport = {
+  width: number;
+  height: number;
+};
+
 type RuntimeOptions = {
   initialContent: string;
   fixedProgress: number | null;
+  fixedViewport: FixedViewport | null;
   forceWebGPU: boolean;
 };
+
+function parseViewport(value: string | null): FixedViewport | null {
+  if (!value) return null;
+  const match = value.trim().match(/^(\d{3,4})x(\d{3,4})$/i);
+  if (!match) return null;
+
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  if (!Number.isFinite(width) || !Number.isFinite(height)) return null;
+
+  return {
+    width: Math.min(1600, Math.max(280, width)),
+    height: Math.min(2400, Math.max(480, height)),
+  };
+}
 
 function readRuntimeOptions(): RuntimeOptions {
   const params = new URLSearchParams(window.location.search);
@@ -25,6 +46,7 @@ function readRuntimeOptions(): RuntimeOptions {
     fixedProgress: Number.isFinite(parsedProgress)
       ? Math.min(1, Math.max(0, parsedProgress))
       : null,
+    fixedViewport: parseViewport(params.get('viewport')),
     forceWebGPU: params.get('forceWebGPU') === '1',
   };
 }
@@ -51,8 +73,16 @@ export default function App() {
     ? scanMode
     : runtime.fixedProgress >= 0.5;
 
+  const referenceStyle = runtime.fixedViewport
+    ? ({
+        '--reference-width': `${runtime.fixedViewport.width}px`,
+        '--reference-canvas-height': `${runtime.fixedViewport.height * 0.6}px`,
+        '--reference-top-offset': `${runtime.fixedViewport.width * 0.1}px`,
+      } as CSSProperties)
+    : undefined;
+
   return (
-    <main className="reference-app">
+    <main className="reference-app" style={referenceStyle}>
       <section
         className="reference-canvas"
         data-mode={effectiveScanMode ? 'scan' : 'world'}
