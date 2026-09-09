@@ -1,7 +1,8 @@
 import { Canvas } from '@react-three/fiber';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import * as THREE from 'three';
 import type { QRMatrix } from '../qr/generateQR';
+import { RNWebGPUWorld } from '../v9/RNWebGPUWorld';
 import { WebGPUWorld } from '../webgpu/WebGPUWorld';
 import { ReferenceVoxelWorldRefined } from './ReferenceVoxelWorldRefined';
 
@@ -13,7 +14,7 @@ type WorldCanvasProps = {
   onCanvasReady?: (canvas: HTMLCanvasElement) => void;
 };
 
-type RendererMode = 'webgpu' | 'webgl';
+type RendererMode = 'rnwebgpu' | 'raw-webgpu' | 'webgl';
 
 type NavigatorWithGPU = Navigator & { gpu?: unknown };
 
@@ -21,8 +22,8 @@ function hasWebGPU() {
   return typeof navigator !== 'undefined' && Boolean((navigator as NavigatorWithGPU).gpu);
 }
 
-function isDebugMode() {
-  return typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
+function params() {
+  return typeof window === 'undefined' ? new URLSearchParams() : new URLSearchParams(window.location.search);
 }
 
 function WebGLFallback({ matrix, scanMode, onCanvasReady }: WorldCanvasProps) {
@@ -56,33 +57,52 @@ export function WorldCanvas({
   forceWebGPU = false,
   onCanvasReady,
 }: WorldCanvasProps) {
-  const [mode, setMode] = useState<RendererMode>(() => (
-    forceWebGPU || hasWebGPU() ? 'webgpu' : 'webgl'
-  ));
-  const debug = isDebugMode();
+  const runtimeParams = useMemo(params, []);
+  const debug = runtimeParams.get('debug') === '1';
+  const requested = runtimeParams.get('renderer');
+  const initialMode: RendererMode = requested === 'raw'
+    ? 'raw-webgpu'
+    : requested === 'webgl'
+      ? 'webgl'
+      : 'rnwebgpu';
+  const [mode, setMode] = useState<RendererMode>(initialMode);
+
   const viewportLabel = typeof window === 'undefined'
     ? ''
     : `${window.innerWidth}×${Math.round(window.innerHeight * 0.6)}`;
 
-  const handleUnavailable = forceWebGPU ? undefined : () => setMode('webgl');
+  const failToFallback = (message?: string) => {
+    console.warn('[QR Worlds v9] RN WebGPU unavailable:', message);
+    if (forceWebGPU) return;
+    if (hasWebGPU()) setMode('raw-webgpu');
+    else setMode('webgl');
+  };
 
   return (
     <div className="reference-stage" data-renderer={mode}>
-      {mode === 'webgl' ? (
-        <WebGLFallback
+      {mode === 'rnwebgpu' ? (
+        <RNWebGPUWorld
           matrix={matrix}
           scanMode={scanMode}
-          onCanvasReady={onCanvasReady}
+          fixedProgress={fixedProgress}
+          onUnavailable={failToFallback}
         />
-      ) : (
+      ) : mode === 'raw-webgpu' ? (
         <WebGPUWorld
           matrix={matrix}
           scanMode={scanMode}
           fixedProgress={fixedProgress}
           onCanvasReady={onCanvasReady}
-          onUnavailable={handleUnavailable}
+          onUnavailable={forceWebGPU ? undefined : () => setMode('webgl')}
+        />
+      ) : (
+        <WebGLFallback
+          matrix={matrix}
+          scanMode={scanMode}
+          onCanvasReady={onCanvasReady}
         />
       )}
+
       {debug ? (
         <div className="renderer-debug">
           {mode.toUpperCase()} · {matrix.moduleCount}×{matrix.moduleCount}
