@@ -2,19 +2,19 @@ import { Canvas } from '@react-three/fiber';
 import { useState } from 'react';
 import * as THREE from 'three';
 import type { QRMatrix } from '../qr/generateQR';
-import { WebGPUWorld } from '../webgpu/WebGPUWorld';
+import { ProceduralWebGPUWorld } from '../procedural/ProceduralWebGPUWorld';
+import type { Season } from '../procedural/generateScene';
 import { ReferenceVoxelWorldRefined } from './ReferenceVoxelWorldRefined';
 
 type WorldCanvasProps = {
   matrix: QRMatrix;
+  season: Season;
   scanMode: boolean;
   fixedProgress?: number | null;
   forceWebGPU?: boolean;
-  onCanvasReady?: (canvas: HTMLCanvasElement) => void;
 };
 
-type RendererMode = 'webgpu' | 'webgl';
-
+type RendererMode = 'procedural-webgpu' | 'webgl';
 type NavigatorWithGPU = Navigator & { gpu?: unknown };
 
 function hasWebGPU() {
@@ -25,22 +25,16 @@ function isDebugMode() {
   return typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
 }
 
-function WebGLFallback({ matrix, scanMode, onCanvasReady }: WorldCanvasProps) {
+function WebGLFallback({ matrix, scanMode }: Pick<WorldCanvasProps, 'matrix' | 'scanMode'>) {
   return (
     <Canvas
       dpr={[1, 1.6]}
       camera={{ position: [0, 0, 2], near: 0.1, far: 10 }}
-      gl={{
-        antialias: true,
-        alpha: false,
-        powerPreference: 'default',
-        preserveDrawingBuffer: true,
-      }}
+      gl={{ antialias: true, alpha: false, powerPreference: 'default' }}
       onCreated={({ gl }) => {
         gl.setClearColor('#f7f7f7', 1);
         gl.toneMapping = THREE.NoToneMapping;
         gl.outputColorSpace = THREE.SRGBColorSpace;
-        onCanvasReady?.(gl.domElement);
       }}
       style={{ width: '100%', height: '100%', background: '#f7f7f7' }}
     >
@@ -51,43 +45,35 @@ function WebGLFallback({ matrix, scanMode, onCanvasReady }: WorldCanvasProps) {
 
 export function WorldCanvas({
   matrix,
+  season,
   scanMode,
   fixedProgress = null,
   forceWebGPU = false,
-  onCanvasReady,
 }: WorldCanvasProps) {
   const [mode, setMode] = useState<RendererMode>(() => (
-    forceWebGPU || hasWebGPU() ? 'webgpu' : 'webgl'
+    forceWebGPU || hasWebGPU() ? 'procedural-webgpu' : 'webgl'
   ));
   const debug = isDebugMode();
-  const viewportLabel = typeof window === 'undefined'
-    ? ''
-    : `${window.innerWidth}×${Math.round(window.innerHeight * 0.6)}`;
-
   const handleUnavailable = forceWebGPU ? undefined : () => setMode('webgl');
 
   return (
     <div className="reference-stage" data-renderer={mode}>
       {mode === 'webgl' ? (
-        <WebGLFallback
-          matrix={matrix}
-          scanMode={scanMode}
-          onCanvasReady={onCanvasReady}
-        />
+        <WebGLFallback matrix={matrix} scanMode={scanMode} />
       ) : (
-        <WebGPUWorld
+        <ProceduralWebGPUWorld
           matrix={matrix}
+          season={season}
           scanMode={scanMode}
           fixedProgress={fixedProgress}
-          onCanvasReady={onCanvasReady}
           onUnavailable={handleUnavailable}
         />
       )}
+
       {debug ? (
         <div className="renderer-debug">
-          {mode.toUpperCase()} · {matrix.moduleCount}×{matrix.moduleCount}
+          {mode.toUpperCase()} · {matrix.size}×{matrix.size} · {season.toUpperCase()}
           {fixedProgress !== null ? ` · P=${fixedProgress.toFixed(2)}` : ''}
-          {viewportLabel ? ` · ${viewportLabel}` : ''}
           {forceWebGPU ? ' · FORCED' : ''}
         </div>
       ) : null}
