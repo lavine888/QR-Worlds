@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { QRMatrix } from '../qr/generateQR';
-import { buildProceduralScene, type ProceduralScene, type Season } from './generateScene';
+import { canopyFragmentShader, canopyVertexShader } from './canopyShaders';
+import { buildHybridScene, type HybridScene } from './generateHybridScene';
+import type { Season } from './generateScene';
 import {
   branchFragmentShader,
   branchVertexShader,
@@ -13,7 +15,7 @@ import {
 type GPULike = any;
 
 const UNIFORM_FLOATS = 16;
-const LERP_SPEED = 3.8;
+const LERP_SPEED = 4.15;
 
 const alphaBlend = {
   color: {
@@ -66,11 +68,10 @@ function createPipeline(
   });
 }
 
-class ProceduralRenderer {
+class HybridRenderer {
   private canvas: HTMLCanvasElement;
-  private matrix: QRMatrix;
   private season: Season;
-  private scene: ProceduralScene;
+  private scene: HybridScene;
   private fixedProgress: number | null;
   private targetProgress = 0;
   private rawProgress = 0;
@@ -89,14 +90,22 @@ class ProceduralRenderer {
   private groundBuffer: GPULike = null;
   private branchStartBuffer: GPULike = null;
   private branchEndBuffer: GPULike = null;
+  private canopyStartBuffer: GPULike = null;
+  private canopyTargetBuffer: GPULike = null;
+  private canopyMetaBuffer: GPULike = null;
+  private canopyMotionBuffer: GPULike = null;
   private spriteBuffer: GPULike = null;
 
   private groundPipeline: GPULike = null;
   private branchPipeline: GPULike = null;
+  private canopyPipeline: GPULike = null;
   private spritePipeline: GPULike = null;
+
   private groundBindGroup: GPULike = null;
   private branchBindGroup: GPULike = null;
+  private canopyBindGroup: GPULike = null;
   private spriteBindGroup: GPULike = null;
+
   private onLost: (message?: string) => void;
 
   constructor(
@@ -107,9 +116,8 @@ class ProceduralRenderer {
     onLost: (message?: string) => void,
   ) {
     this.canvas = canvas;
-    this.matrix = matrix;
     this.season = season;
-    this.scene = buildProceduralScene(matrix, season);
+    this.scene = buildHybridScene(matrix, season);
     this.fixedProgress = fixedProgress;
     this.onLost = onLost;
     if (fixedProgress !== null) this.rawProgress = fixedProgress;
@@ -144,6 +152,10 @@ class ProceduralRenderer {
     this.groundBuffer = this.createStorageBuffer(this.scene.ground);
     this.branchStartBuffer = this.createStorageBuffer(this.scene.branchStart);
     this.branchEndBuffer = this.createStorageBuffer(this.scene.branchEnd);
+    this.canopyStartBuffer = this.createStorageBuffer(this.scene.canopyStart);
+    this.canopyTargetBuffer = this.createStorageBuffer(this.scene.canopyTarget);
+    this.canopyMetaBuffer = this.createStorageBuffer(this.scene.canopyMeta);
+    this.canopyMotionBuffer = this.createStorageBuffer(this.scene.canopyMotion);
     this.spriteBuffer = this.createStorageBuffer(this.scene.sprites);
 
     const groundLayout = this.device.createBindGroupLayout({
@@ -152,6 +164,7 @@ class ProceduralRenderer {
         { binding: 1, visibility: stage.VERTEX, buffer: { type: 'read-only-storage' } },
       ],
     });
+
     const branchLayout = this.device.createBindGroupLayout({
       entries: [
         { binding: 0, visibility: stage.VERTEX | stage.FRAGMENT, buffer: { type: 'uniform' } },
@@ -159,6 +172,17 @@ class ProceduralRenderer {
         { binding: 2, visibility: stage.VERTEX, buffer: { type: 'read-only-storage' } },
       ],
     });
+
+    const canopyLayout = this.device.createBindGroupLayout({
+      entries: [
+        { binding: 0, visibility: stage.VERTEX | stage.FRAGMENT, buffer: { type: 'uniform' } },
+        { binding: 1, visibility: stage.VERTEX, buffer: { type: 'read-only-storage' } },
+        { binding: 2, visibility: stage.VERTEX, buffer: { type: 'read-only-storage' } },
+        { binding: 3, visibility: stage.VERTEX, buffer: { type: 'read-only-storage' } },
+        { binding: 4, visibility: stage.VERTEX, buffer: { type: 'read-only-storage' } },
+      ],
+    });
+
     const spriteLayout = this.device.createBindGroupLayout({
       entries: [
         { binding: 0, visibility: stage.VERTEX | stage.FRAGMENT, buffer: { type: 'uniform' } },
@@ -173,6 +197,7 @@ class ProceduralRenderer {
         { binding: 1, resource: { buffer: this.groundBuffer } },
       ],
     });
+
     this.branchBindGroup = this.device.createBindGroup({
       layout: branchLayout,
       entries: [
@@ -181,6 +206,18 @@ class ProceduralRenderer {
         { binding: 2, resource: { buffer: this.branchEndBuffer } },
       ],
     });
+
+    this.canopyBindGroup = this.device.createBindGroup({
+      layout: canopyLayout,
+      entries: [
+        { binding: 0, resource: { buffer: this.uniformBuffer } },
+        { binding: 1, resource: { buffer: this.canopyStartBuffer } },
+        { binding: 2, resource: { buffer: this.canopyTargetBuffer } },
+        { binding: 3, resource: { buffer: this.canopyMetaBuffer } },
+        { binding: 4, resource: { buffer: this.canopyMotionBuffer } },
+      ],
+    });
+
     this.spriteBindGroup = this.device.createBindGroup({
       layout: spriteLayout,
       entries: [
@@ -206,6 +243,14 @@ class ProceduralRenderer {
       branchFragmentShader,
       { depthWrite: true, blend: alphaBlend },
     );
+    this.canopyPipeline = createPipeline(
+      this.device,
+      this.format,
+      canopyLayout,
+      canopyVertexShader,
+      canopyFragmentShader,
+      { depthWrite: true, blend: alphaBlend },
+    );
     this.spritePipeline = createPipeline(
       this.device,
       this.format,
@@ -216,7 +261,7 @@ class ProceduralRenderer {
     );
 
     const validation = await this.device.popErrorScope?.();
-    if (validation) throw new Error(`Procedural WebGPU validation failed: ${validation.message}`);
+    if (validation) throw new Error(`Hybrid WebGPU validation failed: ${validation.message}`);
 
     this.installResizeObserver();
     this.lastFrame = performance.now();
@@ -247,6 +292,10 @@ class ProceduralRenderer {
     this.groundBuffer?.destroy?.();
     this.branchStartBuffer?.destroy?.();
     this.branchEndBuffer?.destroy?.();
+    this.canopyStartBuffer?.destroy?.();
+    this.canopyTargetBuffer?.destroy?.();
+    this.canopyMetaBuffer?.destroy?.();
+    this.canopyMotionBuffer?.destroy?.();
     this.spriteBuffer?.destroy?.();
     this.uniformBuffer?.destroy?.();
     this.depthTexture?.destroy?.();
@@ -295,6 +344,7 @@ class ProceduralRenderer {
       !this.depthTexture ||
       !this.groundBindGroup ||
       !this.branchBindGroup ||
+      !this.canopyBindGroup ||
       !this.spriteBindGroup
     ) return;
 
@@ -351,6 +401,10 @@ class ProceduralRenderer {
     pass.setBindGroup(0, this.branchBindGroup);
     pass.draw(36 * this.scene.branchCount);
 
+    pass.setPipeline(this.canopyPipeline);
+    pass.setBindGroup(0, this.canopyBindGroup);
+    pass.draw(36 * this.scene.canopyCount);
+
     pass.setPipeline(this.spritePipeline);
     pass.setBindGroup(0, this.spriteBindGroup);
     pass.draw(6 * this.scene.spriteCount);
@@ -377,7 +431,7 @@ export function ProceduralWebGPUWorld({
   onUnavailable,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const rendererRef = useRef<ProceduralRenderer | null>(null);
+  const rendererRef = useRef<HybridRenderer | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -391,7 +445,7 @@ export function ProceduralWebGPUWorld({
       else setError(cause instanceof Error ? cause.message : String(cause ?? 'WebGPU failed.'));
     };
 
-    const renderer = new ProceduralRenderer(canvas, matrix, season, fixedProgress, fail);
+    const renderer = new HybridRenderer(canvas, matrix, season, fixedProgress, fail);
     rendererRef.current = renderer;
     renderer.setFlat(scanMode);
     renderer.init().catch(fail);
