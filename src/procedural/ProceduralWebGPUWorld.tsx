@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { QRMatrix } from '../qr/generateQR';
 import { buildProceduralScene, type ProceduralScene, type Season } from './generateScene';
+import { glowFragmentShader, glowVertexShader } from './glowShaders';
 import {
   branchFragmentShader,
   branchVertexShader,
@@ -61,7 +62,7 @@ function createPipeline(
     depthStencil: {
       format: 'depth24plus',
       depthWriteEnabled: options.depthWrite,
-      depthCompare: 'less',
+      depthCompare: 'less-equal',
     },
   });
 }
@@ -90,13 +91,16 @@ class ProceduralRenderer {
   private branchStartBuffer: GPULike = null;
   private branchEndBuffer: GPULike = null;
   private spriteBuffer: GPULike = null;
+  private glowBuffer: GPULike = null;
 
   private groundPipeline: GPULike = null;
   private branchPipeline: GPULike = null;
   private spritePipeline: GPULike = null;
+  private glowPipeline: GPULike = null;
   private groundBindGroup: GPULike = null;
   private branchBindGroup: GPULike = null;
   private spriteBindGroup: GPULike = null;
+  private glowBindGroup: GPULike = null;
   private onLost: (message?: string) => void;
 
   constructor(
@@ -145,6 +149,7 @@ class ProceduralRenderer {
     this.branchStartBuffer = this.createStorageBuffer(this.scene.branchStart);
     this.branchEndBuffer = this.createStorageBuffer(this.scene.branchEnd);
     this.spriteBuffer = this.createStorageBuffer(this.scene.sprites);
+    this.glowBuffer = this.createStorageBuffer(this.scene.glowParticles);
 
     const groundLayout = this.device.createBindGroupLayout({
       entries: [
@@ -160,6 +165,12 @@ class ProceduralRenderer {
       ],
     });
     const spriteLayout = this.device.createBindGroupLayout({
+      entries: [
+        { binding: 0, visibility: stage.VERTEX | stage.FRAGMENT, buffer: { type: 'uniform' } },
+        { binding: 1, visibility: stage.VERTEX, buffer: { type: 'read-only-storage' } },
+      ],
+    });
+    const glowLayout = this.device.createBindGroupLayout({
       entries: [
         { binding: 0, visibility: stage.VERTEX | stage.FRAGMENT, buffer: { type: 'uniform' } },
         { binding: 1, visibility: stage.VERTEX, buffer: { type: 'read-only-storage' } },
@@ -188,6 +199,13 @@ class ProceduralRenderer {
         { binding: 1, resource: { buffer: this.spriteBuffer } },
       ],
     });
+    this.glowBindGroup = this.device.createBindGroup({
+      layout: glowLayout,
+      entries: [
+        { binding: 0, resource: { buffer: this.uniformBuffer } },
+        { binding: 1, resource: { buffer: this.glowBuffer } },
+      ],
+    });
 
     this.device.pushErrorScope?.('validation');
     this.groundPipeline = createPipeline(
@@ -212,6 +230,14 @@ class ProceduralRenderer {
       spriteLayout,
       spriteVertexShader,
       spriteFragmentShader,
+      { depthWrite: false, blend: alphaBlend },
+    );
+    this.glowPipeline = createPipeline(
+      this.device,
+      this.format,
+      glowLayout,
+      glowVertexShader,
+      glowFragmentShader,
       { depthWrite: false, blend: alphaBlend },
     );
 
@@ -248,6 +274,7 @@ class ProceduralRenderer {
     this.branchStartBuffer?.destroy?.();
     this.branchEndBuffer?.destroy?.();
     this.spriteBuffer?.destroy?.();
+    this.glowBuffer?.destroy?.();
     this.uniformBuffer?.destroy?.();
     this.depthTexture?.destroy?.();
   }
@@ -259,7 +286,7 @@ class ProceduralRenderer {
       size,
       usage: usage.STORAGE | usage.COPY_DST,
     });
-    this.device.queue.writeBuffer(buffer, 0, data);
+    if (data.byteLength > 0) this.device.queue.writeBuffer(buffer, 0, data);
     return buffer;
   }
 
@@ -295,7 +322,8 @@ class ProceduralRenderer {
       !this.depthTexture ||
       !this.groundBindGroup ||
       !this.branchBindGroup ||
-      !this.spriteBindGroup
+      !this.spriteBindGroup ||
+      !this.glowBindGroup
     ) return;
 
     const now = performance.now();
@@ -354,6 +382,12 @@ class ProceduralRenderer {
     pass.setPipeline(this.spritePipeline);
     pass.setBindGroup(0, this.spriteBindGroup);
     pass.draw(6 * this.scene.spriteCount);
+
+    if (this.scene.glowCount > 0) {
+      pass.setPipeline(this.glowPipeline);
+      pass.setBindGroup(0, this.glowBindGroup);
+      pass.draw(6 * this.scene.glowCount);
+    }
 
     pass.end();
     this.device.queue.submit([encoder.finish()]);
