@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { QRMatrix } from '../qr/generateQR';
-import { buildProceduralScene, type Season } from './generateScene';
+import { buildProceduralScene, type ProceduralScene, type Season } from './generateScene';
 
 type Props = {
   matrix: QRMatrix;
@@ -23,6 +23,156 @@ function palette(season: Season) {
   if (season === 'summer') return { crown: '#5d8f54', petal: '#8fb879', branch: '#49362b' };
   if (season === 'autumn') return { crown: '#c9823e', petal: '#d89a55', branch: '#51362a' };
   return { crown: '#d9809d', petal: '#e7a0b8', branch: '#4f372f' };
+}
+
+function seasonIndex(season: Season) {
+  if (season === 'summer') return 1;
+  if (season === 'autumn') return 2;
+  return 0;
+}
+
+function GlowField({
+  scene,
+  season,
+  scanMode,
+  fixedProgress,
+}: {
+  scene: ProceduralScene;
+  season: Season;
+  scanMode: boolean;
+  fixedProgress: number | null;
+}) {
+  const progress = useRef(fixedProgress ?? (scanMode ? 1 : 0));
+  const materialRef = useRef<THREE.ShaderMaterial>(null);
+
+  const geometry = useMemo(() => {
+    const positions = new Float32Array(scene.glowCount * 3);
+    const sizes = new Float32Array(scene.glowCount);
+    const motions = new Float32Array(scene.glowCount * 4);
+
+    for (let i = 0; i < scene.glowCount; i += 1) {
+      const src = i * 8;
+      const p = i * 3;
+      const m = i * 4;
+      positions[p] = scene.glowParticles[src];
+      positions[p + 1] = scene.glowParticles[src + 1];
+      positions[p + 2] = scene.glowParticles[src + 2];
+      sizes[i] = scene.glowParticles[src + 3];
+      motions[m] = scene.glowParticles[src + 4];
+      motions[m + 1] = scene.glowParticles[src + 5];
+      motions[m + 2] = scene.glowParticles[src + 6];
+      motions[m + 3] = scene.glowParticles[src + 7];
+    }
+
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    g.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+    g.setAttribute('aMotion', new THREE.BufferAttribute(motions, 4));
+    return g;
+  }, [scene]);
+
+  const material = useMemo(() => new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uProgress: { value: progress.current },
+      uGroundSpan: { value: scene.groundSpan },
+      uSeason: { value: seasonIndex(season) },
+    },
+    vertexShader: `
+      attribute float aSize;
+      attribute vec4 aMotion;
+      uniform float uTime;
+      uniform float uProgress;
+      uniform float uGroundSpan;
+      varying float vBrightness;
+      varying float vPhase;
+      varying float vFlare;
+
+      void main() {
+        float orbitRadius = aMotion.x;
+        float speed = aMotion.y;
+        float phase = aMotion.z;
+        float brightness = aMotion.w;
+        float angle = phase + uTime * speed;
+
+        vec3 p = position;
+        p.x += cos(angle) * orbitRadius;
+        p.z += sin(angle) * orbitRadius;
+        p.y += sin(uTime * 0.72 + phase) * orbitRadius * 0.34;
+
+        float scatter = smoothstep(0.08, 0.46, uProgress);
+        p.x += cos(phase * 1.37) * scatter * uGroundSpan * 0.075;
+        p.z += sin(phase * 1.13) * scatter * uGroundSpan * 0.075;
+        p.y += scatter * uGroundSpan * 0.028;
+
+        float reveal = 1.0 - smoothstep(0.08, 0.50, uProgress);
+        float flare = exp(-pow((uProgress - 0.12) / 0.075, 2.0));
+        float pulse = 0.83 + 0.17 * sin(uTime * 1.08 + phase);
+        vec4 mv = modelViewMatrix * vec4(p, 1.0);
+
+        gl_Position = projectionMatrix * mv;
+        gl_PointSize = max(1.0, aSize * 1800.0 * mix(1.0, 1.18, flare) * reveal / max(0.8, -mv.z));
+        vBrightness = brightness * pulse * reveal;
+        vPhase = phase;
+        vFlare = flare;
+      }
+    `,
+    fragmentShader: `
+      uniform float uSeason;
+      varying float vBrightness;
+      varying float vPhase;
+      varying float vFlare;
+
+      void main() {
+        vec2 q = gl_PointCoord * 2.0 - 1.0;
+        float d2 = dot(q, q);
+        if (d2 > 1.0) discard;
+
+        float core = exp(-d2 * 6.8);
+        float halo = exp(-d2 * 2.15) * 0.24;
+        float sparkle = pow(max(core, 0.0), 2.2) * (0.08 + vFlare * 0.10);
+        float alpha = (core * 0.28 + halo * 0.17 + sparkle) * vBrightness;
+        if (alpha < 0.004) discard;
+
+        vec3 warm = vec3(1.0, 0.94, 0.86);
+        vec3 accent = vec3(1.0, 0.73, 0.80);
+        if (uSeason > 0.5 && uSeason < 1.5) {
+          warm = vec3(0.94, 1.0, 0.86);
+          accent = vec3(0.69, 0.91, 0.56);
+        }
+        if (uSeason > 1.5) {
+          warm = vec3(1.0, 0.91, 0.72);
+          accent = vec3(1.0, 0.62, 0.25);
+        }
+
+        float variation = 0.10 + 0.08 * sin(vPhase * 2.7);
+        vec3 color = mix(warm, accent, variation + vFlare * 0.05);
+        gl_FragColor = vec4(color, alpha);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+    blending: THREE.NormalBlending,
+  }), [scene.groundSpan, season]);
+
+  useEffect(() => () => {
+    geometry.dispose();
+    material.dispose();
+  }, [geometry, material]);
+
+  useFrame((state, dt) => {
+    const target = fixedProgress ?? (scanMode ? 1 : 0);
+    progress.current += (target - progress.current) * Math.min(1, dt * 4.2);
+    if (!materialRef.current) return;
+    materialRef.current.uniforms.uTime.value = state.clock.elapsedTime;
+    materialRef.current.uniforms.uProgress.value = progress.current;
+    materialRef.current.uniforms.uSeason.value = seasonIndex(season);
+  });
+
+  return <points geometry={geometry} material={material} ref={undefined} frustumCulled={false}>
+    <primitive object={material} ref={materialRef} attach="material" />
+  </points>;
 }
 
 export function ProceduralWebGLFallback({ matrix, season, scanMode, fixedProgress = null }: Props) {
@@ -155,6 +305,13 @@ export function ProceduralWebGLFallback({ matrix, season, scanMode, fixedProgres
         <tetrahedronGeometry args={[1, 0]} />
         <meshStandardMaterial color={colors.petal} roughness={0.78} transparent />
       </instancedMesh>
+
+      <GlowField
+        scene={scene}
+        season={season}
+        scanMode={scanMode}
+        fixedProgress={fixedProgress}
+      />
     </group>
   );
 }
