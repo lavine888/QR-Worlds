@@ -7,9 +7,11 @@ export type ProceduralScene = {
   branchStart: Float32Array;
   branchEnd: Float32Array;
   sprites: Float32Array;
+  glowParticles: Float32Array;
   groundCount: number;
   branchCount: number;
   spriteCount: number;
+  glowCount: number;
   gridSize: number;
   cellSize: number;
   groundSpan: number;
@@ -223,9 +225,49 @@ function generateTree(seed: number, groundSpan: number) {
 }
 
 function seasonDensity(season: Season) {
-  if (season === 'summer') return { crown: 7, petals: 34, grass: 0.42 };
-  if (season === 'autumn') return { crown: 5, petals: 150, grass: 0.30 };
-  return { crown: 4, petals: 110, grass: 0.26 };
+  if (season === 'summer') return { crown: 7, petals: 34, grass: 0.42, glow: 72 };
+  if (season === 'autumn') return { crown: 5, petals: 150, grass: 0.30, glow: 88 };
+  return { crown: 4, petals: 110, grass: 0.26, glow: 100 };
+}
+
+function generateGlowField(
+  tips: Vec3[],
+  seed: number,
+  count: number,
+  groundSpan: number,
+) {
+  const rng = mulberry32(seed ^ 0x51ed270b);
+  const glow: number[] = [];
+  if (tips.length === 0) return new Float32Array(glow);
+
+  for (let i = 0; i < count; i += 1) {
+    const tip = tips[Math.floor(rng() * tips.length)];
+    const outer = i >= Math.floor(count * 0.82);
+    const angle = rng() * Math.PI * 2;
+    const radial = CELL_SIZE * (outer ? 2.0 + rng() * 4.5 : 0.45 + rng() * 2.4);
+    const vertical = CELL_SIZE * (outer ? 1.2 + rng() * 5.0 : 0.25 + rng() * 2.8);
+    const x = tip[0] + Math.cos(angle) * radial;
+    const y = tip[1] + (rng() - 0.32) * vertical;
+    const z = tip[2] + Math.sin(angle) * radial;
+    const size = CELL_SIZE * (outer ? 0.12 + rng() * 0.13 : 0.14 + rng() * 0.24);
+    const orbitRadius = CELL_SIZE * (outer ? 0.9 + rng() * 2.2 : 0.25 + rng() * 1.25);
+    const speed = (outer ? 0.035 : 0.06) + rng() * (outer ? 0.07 : 0.17);
+    const phase = rng() * Math.PI * 2;
+    const brightness = outer ? 0.24 + rng() * 0.34 : 0.38 + rng() * 0.56;
+
+    glow.push(
+      x,
+      Math.max(CELL_SIZE * 0.6, Math.min(y, groundSpan * 1.35)),
+      z,
+      size,
+      orbitRadius,
+      speed,
+      phase,
+      brightness,
+    );
+  }
+
+  return new Float32Array(glow);
 }
 
 export function buildProceduralScene(matrix: QRMatrix, season: Season): ProceduralScene {
@@ -289,14 +331,18 @@ export function buildProceduralScene(matrix: QRMatrix, season: Season): Procedur
     );
   }
 
+  const glowParticles = generateGlowField(tree.tips, seed, density.glow, groundSpan);
+
   return {
     ground: new Float32Array(ground),
     branchStart: tree.branchStart,
     branchEnd: tree.branchEnd,
     sprites: new Float32Array(sprites),
+    glowParticles,
     groundCount: ground.length / 4,
     branchCount: tree.branchStart.length / 4,
     spriteCount: sprites.length / 4,
+    glowCount: glowParticles.length / 8,
     gridSize: size,
     cellSize: CELL_SIZE,
     groundSpan,
